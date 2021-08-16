@@ -15,7 +15,7 @@ class ligPrep:
 
     def loadMol(self, mol_path):
         self.mol = openbabel.pybel(mol_path)
-    
+
     def test(self):
         pass
 
