@@ -1,6 +1,6 @@
 
 from ligPrep import ligPrep
-mol_path = "./test/article_No13_8.xyz"
+mol_path = "./Test_sdf_files/M20.sdfz"
 lig = ligPrep(mol_path)
 lig.addH()
 lig.obMol2RWmol()
