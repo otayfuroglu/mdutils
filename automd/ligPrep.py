@@ -98,7 +98,8 @@ class ligPrep:
         )
 
         for i, conformerId  in enumerate(confs):
-            e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
+            #  e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
+            e = self._gemOptWithG16(conformerId, 'B3LYP', "sto-3g", fmax=0.05)
             #  e = self._calcEnergyWithG16(conformerId, 'B3LYP', "sto-3g")
             if i == 0:
                 minE = e
@@ -160,7 +161,7 @@ class ligPrep:
             scf="maxcycle=100",
         ))
 
-        dyn = BFGS(water)
+        dyn = BFGS(ase_atoms)
         dyn.run(fmax)
 
         return ase_atoms.get_potential_energy()
@@ -175,6 +176,8 @@ class ligPrep:
 
         return Atoms(atom_species, positions)
 
+#      def alignMols(self, mol):
+#          rdkit.Chem.rdMolAlign.AlignMol(mol, self.rw_mol)
 
 
 #  def alignConfs(mol, clust_ids):
