@@ -155,11 +155,14 @@ class ligPrep:
 
         ase_atoms.set_calculator(
             Gaussian(
-            label = "tempG16/gaussionSPE",
-            xc=xc,
-            basis=basiset,
-            scf="maxcycle=100",
-        ))
+                label = "tempG16/gaussionSPE",
+                xc=xc,
+                basis=basiset,
+                scf="maxcycle=100",
+                cpu="0-16"
+
+            )
+        )
 
         dyn = BFGS(ase_atoms)
         dyn.run(fmax)
