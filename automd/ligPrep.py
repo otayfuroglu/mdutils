@@ -98,9 +98,9 @@ class ligPrep:
         )
 
         for i, conformerId  in enumerate(confs):
-            #  e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
-            e = self._gemOptWithG16(conformerId, 'B3LYP', "sto-3g", fmax=0.05)
-            #  e = self._calcEnergyWithG16(conformerId, 'B3LYP', "sto-3g")
+            #e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
+            e = self._gemOptWithG16(mol, conformerId, 'B3LYP', "sto-3g", fmax=0.05)
+            #e = self._calcEnergyWithG16(mol, conformerId, 'B3LYP', "sto-3g")
             if i == 0:
                 minE = e
                 minEGonformerID = conformerId
@@ -128,28 +128,10 @@ class ligPrep:
         results["energy_abs"] = ff.CalcEnergy()
         return results
 
-    def _calcEnergyWithG16(self, conformerId, xc, basiset):
+    def _calcEnergyWithG16(self, mol, conformerId, xc, basiset):
         from ase.calculators.gaussian import Gaussian
 
-        ase_atoms = self._rwConformer2AseAtoms(conformerId)
-        #  from ase.io import write
-        #  write("test_ase_atoms.xyz", ase_atoms)
-
-        ase_atoms.set_calculator(
-            Gaussian(
-            label = "tempG16/gaussionSPE",
-            xc=xc,
-            basis=basiset,
-            scf="maxcycle=100",
-        ))
-
-        return ase_atoms.get_potential_energy()
-
-    def _gemOptWithG16(self, conformerId, xc, basiset, fmax=0.05):
-        from ase.calculators.gaussian import Gaussian
-        from ase.optimize import BFGS
-
-        ase_atoms = self._rwConformer2AseAtoms(conformerId)
+        ase_atoms = self._rwConformer2AseAtoms(mol, conformerId)
         #  from ase.io import write
         #  write("test_ase_atoms.xyz", ase_atoms)
 
@@ -159,7 +141,30 @@ class ligPrep:
                 xc=xc,
                 basis=basiset,
                 scf="maxcycle=100",
-                cpu="0-16"
+                #cpu="0-15",
+                nprocshared="32"
+
+            )
+        )
+
+        return ase_atoms.get_potential_energy()
+
+    def _gemOptWithG16(self, mol, conformerId, xc, basiset, fmax=0.05):
+        from ase.calculators.gaussian import Gaussian
+        from ase.optimize import BFGS
+
+        ase_atoms = self._rwConformer2AseAtoms(mol, conformerId)
+        #  from ase.io import write
+        #  write("test_ase_atoms.xyz", ase_atoms)
+
+        ase_atoms.set_calculator(
+            Gaussian(
+                label = "tempG16/gaussionSPE",
+                xc=xc,
+                basis=basiset,
+                scf="maxcycle=100",
+                #cpu="0-15",
+                nprocshared="32"
 
             )
         )
@@ -169,10 +174,10 @@ class ligPrep:
 
         return ase_atoms.get_potential_energy()
 
-    def _rwConformer2AseAtoms(self, conformerId):
+    def _rwConformer2AseAtoms(self, mol, conformerId):
         from ase import Atoms
 
-        mol = self.rw_mol.GetConformer(conformerId)
+        mol = mol.GetConformer(conformerId)
 
         atom_species = [atom.GetAtomicNum() for atom in mol.GetOwningMol().GetAtoms()]
         positions = mol.GetPositions()
