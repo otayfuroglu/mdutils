@@ -4,9 +4,9 @@ import time
 
 start = time.time()
 
-mol_pathc= "./test/M20.sdf"
-lig = licPrep(mol_path)
-lig.genMcnEGonformer("minE_conformer.sdf")
+mol_path= "./test/M20.sdf"
+lig = ligPrep(mol_path)
+lig.genMinEGonformer("minE_conformer_M20.sdf")
 
 spend_time =(time.time() - start) / 60.0
 print("time: {0:.2f} minute".format(spend_time))
