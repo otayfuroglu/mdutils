@@ -1,15 +1,22 @@
 
 from ligPrep import ligPrep
 import time
+import os
 
-start = time.time()
+file_names = os.listdir("./test/untested")
 
-mol_pathc= "./test/M20.sdf"
-lig = licPrep(mol_path)
-lig.genMcnEGonformer("minE_conformer.sdf")
 
-spend_time =(time.time() - start) / 60.0
-print("time: {0:.2f} minute".format(spend_time))
+for file_name in file_names:
+
+    start = time.time()
+
+    mol_path= "./test/untested/%s"%file_name
+    lig = ligPrep(mol_path)
+    lig.setMaxCycle(250)
+    lig.genMinEGonformer("minE_conformer/minE_conformer_%s"%file_name)
+
+    spend_time =(time.time() - start) / 60.0
+    print("time: {0:.2f} minute".format(spend_time))
 
 
 

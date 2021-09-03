@@ -26,6 +26,10 @@ class ligPrep:
         self.rw_mol = None
         self._obMol2RWmol()
 
+        self.maxcycle = None
+        if self.maxcycle is None:
+            self.maxcycle = 100000
+
     def _getFileFormat(self):
         return self.mol_path.split(".")[-1]
 
@@ -164,15 +168,18 @@ class ligPrep:
                 basis=basiset,
                 scf="maxcycle=100",
                 #cpu="0-15",
-                nprocshared="32"
+                nprocshared="24"
 
             )
         )
 
         dyn = BFGS(ase_atoms)
-        dyn.run(fmax)
+        dyn.run(fmax,steps=self.maxcycle)
 
         return ase_atoms.get_potential_energy()
+    
+    def setMaxCycle(self, maxcycle):
+        self.maxcycle = maxcycle
 
     def _rwConformer2AseAtoms(self, mol, conformerId):
         from ase import Atoms
