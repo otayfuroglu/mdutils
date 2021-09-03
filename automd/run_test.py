@@ -5,6 +5,12 @@ import os
 
 file_names = os.listdir("./test/untested")
 
+<<<<<<< HEAD
+=======
+mol_path= "./test/M20.sdf"
+lig = ligPrep(mol_path)
+lig.genMinEGonformer("minE_conformer_M20.sdf")
+>>>>>>> 8420195a0bf87e3d4ded7742c4fdb74bcac30788
 
 for file_name in file_names:
 
