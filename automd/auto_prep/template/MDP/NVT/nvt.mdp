@@ -1,0 +1,49 @@
+define      = -DPOSRES -DPOSRES_LIG ; position restrain the protein and ligand
+; Run control
+integrator               = md       ;leap-frog integrator 
+tinit                    = 0
+dt                       = 0.002
+nsteps                   = 500000    ; 1000 ps
+; Output control
+nstxout			 = 1000
+nstvout			 = 1000
+nstlog                   = 1000
+nstenergy                = 1000
+; Neighborsearching and short-range nonbonded interactions
+cutoff-scheme            = verlet
+nstlist                  = 20
+ns_type                  = grid
+pbc                      = xyz
+rlist                    = 1.2
+; Electrostatics
+coulombtype              = PME
+rcoulomb                 = 1.2
+; van der Waals
+vdwtype                  = cutoff
+vdw-modifier             = Force-switch
+rvdw-switch              = 1.0
+rvdw                     = 1.2
+; Apply long range dispersion corrections for Energy and Pressure
+DispCorr                  = EnerPres
+; Spacing for the PME/PPPM FFT grid
+fourierspacing           = 0.16
+; EWALD/PME/PPPM parameters
+pme_order                = 4
+ewald_rtol               = 1e-05
+epsilon_surface          = 0
+; Temperature coupling
+; tcoupl is implicitly handled by the sd integrator
+tcoupl                   = V-rescale
+tc-grps     = Protein_ Water_and_ions 
+tau_t                    = 1.0   1.0
+ref_t                    = 310   310
+; Pressure coupling is off for NVT
+Pcoupl                   = No
+gen_vel                  = yes
+gen_temp                 = 310
+gen_seed                 = -1 
+constraints              = h-bonds  
+constraint-algorithm     = lincs
+continuation             = no 
+lincs-order              = 4
+lincs-iter               = 1

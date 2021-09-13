@@ -1,0 +1,35 @@
+; Include forcefield parameters
+#include "./amber99sb-ildn.ff/forcefield.itp"
+# include "./LIGAND_GMX_GAFF.rtp"
+
+; Include forcefield parameters
+#include "./topol_protein.itp"
+
+; Include ligand topology
+#include "./LIGAND_GMX.itp"
+
+#ifdef POSRES_LIG
+#include "./posre_ligand.itp"
+#endif
+
+; Include water topology
+#include "./amber99sb-ildn.ff/tip3p.itp"
+
+#ifdef POSRES_WATER
+; Position restraint for each water oxygen
+[ position_restraints ]
+;  i funct       fcx        fcy        fcz
+   1    1       1000       1000       1000
+#endif
+
+; Include ions topology
+#include "./amber99sb-ildn.ff/ions.itp"
+
+
+[ system ]
+Protein_LIG in water
+
+[ molecules ]
+; Compound        nmols
+Protein		  1
+LIGAND               1
