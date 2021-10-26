@@ -63,16 +63,16 @@ model_anix_path = '%s/ani_models/ani-1x_8x.info' %aniDIR
 model_aniccx_path = '%s/ani_models/ani-1ccx_8x.info' %aniDIR
 model_ani2x_path = '%s/ani_models/ani-2x_8x.info' %aniDIR
 
-def calcSPWithAni(model_path, structure_dir, traj_path, file_base):
+def calcSPWithAni(model_path, traj_path, mol):
 
-    mol_path = structure_dir + "/" + file_base + ".xyz"
+    # mol_path = structure_dir + "/" + file_base + ".xyz"
 
     # check .xyz structure file
-    if not os.path.exists(mol_path):
-        pdb2xyz(structure_dir, file_base)
+    #if not os.path.exists(mol_path):
+    #    pdb2xyz(structure_dir, file_base)
 
     # Read molecule from xyz
-    mol = read(mol_path)
+    # mol = read(mol_path)
     # set calculator
     mol.set_calculator(ANIENS(aniensloader(model_path, 0)))
 
@@ -87,7 +87,7 @@ def runSPgroupedMultiMol(grp1, grp2, directory, base, seq_start, seq_end):
     list_results = []
     structure_dir = directory
     traj_path =  "%s/traj_files" %structure_dir
-
+    
     if not os.path.exists(traj_path):
         traj_path = os.mkdir(traj_path)
 
@@ -100,6 +100,12 @@ def runSPgroupedMultiMol(grp1, grp2, directory, base, seq_start, seq_end):
 
     for i in range(seq_start, seq_end):
         file_base = "{}{}".format(base, i)
+
+        prepare_xyz_complex(structure_dir, file_base, grp1, grp2)
+        mol_path = structure_dir + "/" + file_base + ".xyz"
+        mol = read(mol_path)
+        atom_types = mol.get_chemical_symbols()
+
         list_results_anix = [str(file_base)]
         list_results_aniccx = []
         list_results_ani2x = []
@@ -108,13 +114,17 @@ def runSPgroupedMultiMol(grp1, grp2, directory, base, seq_start, seq_end):
         #file_base = file_name.replace(".pdb", "").replace(".xyz", "")
         print("Calcultion starts for %s" %file_base)
 
-        #  try:
-        prepare_xyz_complex(structure_dir, file_base)
-        #results_anix = calcSPWithAni(model_anix_path, structure_dir, traj_path, file_base)
-        results_anix  = 0
-        #results_aniccx = calcSPWithAni(model_aniccx_path, structure_dir, traj_path, file_base)
-        results_aniccx = 0
-        results_ani2x = calcSPWithAni(model_ani2x_path, structure_dir, traj_path, file_base)
+        # check atom type for ani2x
+        ani2_atom_type = [sym for sym in atom_types if sym in ["Cl", "F", "S"]]
+
+        if len(ani2_atom_type) >= 1:
+            results_anix = 0
+            results_aniccx = 0
+            results_ani2x = calcSPWithAni(model_ani2x_path, traj_path, mol)
+        else:
+            results_anix = calcSPWithAni(model_anix_path, traj_path, mol)
+            results_aniccx = calcSPWithAni(model_aniccx_path, traj_path, mol)
+            results_ani2x = calcSPWithAni(model_ani2x_path, traj_path, mol)
         list_results_anix.append(results_anix)
         list_results_aniccx.append(results_aniccx)
         list_results_ani2x.append(results_ani2x)
@@ -122,11 +132,16 @@ def runSPgroupedMultiMol(grp1, grp2, directory, base, seq_start, seq_end):
         for grp in [grp1, grp2]:
             prepare_xyz_grp(grp, structure_dir, file_base)
             file_base_new = "{}_{}".format(file_base, grp)
-            #results_anix = calcSPWithAni(model_anix_path, structure_dir, traj_path, file_base_new)
-            results_anix  = 0
-            #results_aniccx = calcSPWithAni(model_aniccx_path, structure_dir, traj_path, file_base_new)
-            results_aniccx = 0
-            results_ani2x = calcSPWithAni(model_ani2x_path, structure_dir, traj_path, file_base_new)
+            mol_path = structure_dir + "/" + file_base_new + ".xyz"
+            mol = read(mol_path)
+            if len(ani2_atom_type) >= 1:
+                results_anix = 0
+                results_aniccx = 0
+                results_ani2x = calcSPWithAni(model_ani2x_path, traj_path, mol)
+            else:
+                results_anix = calcSPWithAni(model_anix_path, traj_path, mol)
+                results_aniccx = calcSPWithAni(model_aniccx_path, traj_path, mol)
+                results_ani2x = calcSPWithAni(model_ani2x_path, traj_path, mol)
             list_results_anix.append(results_anix)
             list_results_aniccx.append(results_aniccx)
             list_results_ani2x.append(results_ani2x)
@@ -157,21 +172,27 @@ def runSPmultiMol(directory, base, seq_start, seq_end):
 
     for i in tqdm.trange(seq_start, seq_end):
         file_base = "{}{}".format(base, i)
+        mol_path = structure_dir + "/" + file_base + ".xyz"
+        mol = read(mol_path)
+        atom_types = mol.get_chemical_symbols()
         #i += 1
         #  print("%d. pdb file is processing ..." %i)
         #  print("Calcultion starts for %s" %file_base)
 
-        #  try:
-        results_anix = calcSPWithAni(model_anix_path, structure_dir, traj_path, file_base)
-        results_aniccx = calcSPWithAni(model_aniccx_path, structure_dir, traj_path, file_base)
-        results_ani2x = calcSPWithAni(model_ani2x_path, structure_dir, traj_path, file_base)
-        list_results = [str(file_base), results_anix, results_aniccx, results_ani2x]
+        # check atom type for ani2x
+        ani2_atom_type = [sym for sym in atom_types if sym in ["Cl", "F", "S"]]
 
-        #  except:
-        #      print("Error for {}\nSkipping...\n".format(file_base))
-        #      list_results = np.zeros(len(labels))
-        #      list_results[0] = str(file_base)
-        #print(list_results)
+        if len(ani2_atom_type) >= 1:
+            results_anix = 0
+            results_aniccx = 0
+            results_ani2x = calcSPWithAni(model_ani2x_path, traj_path, mol)
+            list_results = [str(file_base), results_anix, results_aniccx, results_ani2x]
+        else:
+            results_anix = calcSPWithAni(model_anix_path, traj_path, mol)
+            results_aniccx = calcSPWithAni(model_aniccx_path, traj_path, mol)
+            results_ani2x = calcSPWithAni(model_ani2x_path, traj_path, mol)
+            list_results = [str(file_base), results_anix, results_aniccx, results_ani2x]
+
         df_results = pd.DataFrame([list_results], columns=labels)
         df_results.to_csv("%s/%s_SP_energies.csv" %(structure_dir, directory), mode="a", header=False)
 
@@ -180,13 +201,26 @@ def runSP(directory, file_base):
     structure_dir = directory
     traj_path =  "%s/traj_files" %structure_dir
 
+    mol_path = structure_dir + "/" + file_base + ".xyz"
+    mol = read(mol_path)
+    atom_types = mol.get_chemical_symbols()
+
     if not os.path.exists(traj_path):
         traj_path = os.mkdir(traj_path)
 
-    results_anix = calcSPWithAni(model_anix_path, structure_dir, traj_path, file_base)
-    results_aniccx = calcSPWithAni(model_aniccx_path, structure_dir, traj_path, file_base)
-    results_ani2x = calcSPWithAni(model_ani2x_path, structure_dir, traj_path, file_base)
-    list_results = [str(file_base), results_anix, results_aniccx, results_ani2x]
+    # check atom type for ani2x
+    ani2_atom_type = [sym for sym in atom_types if sym in ["Cl", "F", "S"]]
+
+    if len(ani2_atom_type) >= 1:
+        results_anix = 0
+        results_aniccx = 0
+        results_ani2x = calcSPWithAni(model_ani2x_path, traj_path, mol)
+        list_results = [str(file_base), results_anix, results_aniccx, results_ani2x]
+    else:
+        results_anix = calcSPWithAni(model_anix_path, traj_path, mol)
+        results_aniccx = calcSPWithAni(model_aniccx_path, traj_path, mol)
+        results_ani2x = calcSPWithAni(model_ani2x_path, traj_path, mol)
+        list_results = [str(file_base), results_anix, results_aniccx, results_ani2x]
 
     labels = ["Mol", "SPE_anix", "SPE_aniccx", "SPE_ani2x"]
     for label, value in zip(labels, list_results):
@@ -198,13 +232,15 @@ def runOptSingleMol(structure_dir, file_base, thr_fmax):
 
     if not os.path.exists(traj_path):
         traj_path = os.mkdir(traj_path)
+    
+    prepare_xyz_complex(structure_dir, file_base)
 
     mol_path = structure_dir + "/" + file_base + ".xyz"
 
     # check .xyz structure file
-    if not os.path.exists(mol_path):
-        pdb2xyz(structure_dir, file_base)
-
+    #if not os.path.exists(mol_path):
+    #pdb2xyz(structure_dir, file_base)
+    
     # Read molecule from xyz
     mol = read(mol_path)
 
@@ -234,8 +270,8 @@ def runOptFreqSingleMol(structure_dir, file_base, thr_fmax):
     mol_path = structure_dir + "/" + file_base + ".xyz"
 
     # check .xyz structure file
-    if not os.path.exists(mol_path):
-        pdb2xyz(structure_dir, file_base)
+    #if not os.path.exists(mol_path):
+    #    pdb2xyz(structure_dir, file_base)
 
     # Read molecule from xyz
     mol = read(mol_path)
@@ -291,7 +327,8 @@ def runOptMultiMol(directory, base, seq_start, seq_end, thr_fmax):
 
         print("Calcultion starts for %s" %file_base)
         #convert from pdb to xyz
-        pdb2xyz(structure_dir, file_base)
+        #if not os.path.exists(mol_path):
+        #    pdb2xyz(structure_dir, file_base)
         #try:
         results = runOptSingleMol(directory, file_base, thr_fmax)
         #except:
@@ -349,3 +386,4 @@ elif args.calcMode == "opt_freq_single_mol":
     file_base = args.fbase
     thr_fmax= args.thr_fmax
     runOptFreqSingleMol(structDIR, file_base, thr_fmax)
+
