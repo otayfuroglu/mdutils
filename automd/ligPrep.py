@@ -1,11 +1,12 @@
 
 
-import openbabel
-from openbabel import pybel
+#  import openbabel
+#  from openbabel import pybel
 import rdkit
-import rdkit.Chem
-import rdkit.Chem.AllChem
+from  rdkit import Chem
+from  rdkit.Chem import AllChem
 import os_util
+import sys
 
 class ligPrep:
     """
@@ -14,32 +15,30 @@ class ligPrep:
 
     def __init__(self, mol_path):
         self.mol_path = mol_path
-        # get file format 
-        self.init_file_format = self._getFileFormat()
-
-
-        # load OB molecule
-        self.ob_mol = None
-        self._loadMol()
 
         # initialize RW mol
         self.rw_mol = None
-        self._obMol2RWmol()
+        self._loadRWMol()
 
-        self.maxcycle = None
-        if self.maxcycle is None:
-            self.maxcycle = 100000
+        # initialize calcultor
+        self.calculator = None
 
-    def _getFileFormat(self):
+        # initialize geom opt paprameters
+        self.maxiter = None
+        self.fmax = None
+
+    def _getFileFormat(self, file_path=None):
+        if file_path:
+            return file_path.split(".")[-1]
+
         return self.mol_path.split(".")[-1]
 
-    def _loadMol(self):
-        # mol = readfile("smi", "myfile.smi").next() # Python 2
-        # mol = next(readfile("smi", "myfile.smi"))  # Python 3
-        self.ob_mol = next(pybel.readfile(self.init_file_format, self.mol_path))
+    def _loadRWMol(self):
+        if self._getFileFormat() != "mol2":
+            print("Error: File fomat is NOT mol2")
+            sys.exit(1)
+        self.rw_mol = Chem.rdmolfiles.MolFromMol2File(self.mol_path)
 
-    def addHwithOB(self):
-         self.ob_mol.addh()
 
     def _addHwithRD(self):
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
@@ -49,25 +48,12 @@ class ligPrep:
         if os.path.exists(file_path):
             os.remove(file_path)
 
-    def _obMol2RWmol(self):
-        temp_file_name = "temp_ob_file.mol2"
-        self.writeOBMol2File("mol2", temp_file_name)
-        self.rw_mol = rdkit.Chem.rdmolfiles.MolFromMol2File(temp_file_name)
-
-        # remove temp
-        self._rmFileExist(temp_file_name)
-
-    def writeOBMol2File(self, file_format, file_path):
-        with pybel.Outputfile(file_format, file_path) as fl:
-            fl.write(self.ob_mol)
-
     def writeRWMol2File(self, file_path):
-        import sys
 
         # add missing H
         self._addHwithRD()
 
-        file_format = file_path.split(".")[-1]
+        file_format = self._getFileFormat(file_path)
 
         if file_format == "xyz":
             rdkit.Chem.rdmolfiles.MolToXYZFile(self.rw_mol, file_path)
@@ -80,7 +66,9 @@ class ligPrep:
     def genMinEGonformer(self, file_path,
                          numConfs=20,
                          maxAttempts=1000,
-                         pruneRmsThresh=0.5,
+                         pruneRmsThresh=0.1,
+                         mmCalculator=False,
+                         optimization=False,
                          useExpTorsionAnglePrefs=True,
                          useBasicKnowledge=True,
                          enforceChirality=True):
@@ -102,9 +90,14 @@ class ligPrep:
         )
 
         for i, conformerId  in enumerate(confs):
-            #e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
-            e = self._gemOptWithG16(mol, conformerId, 'B3LYP', "sto-3g", fmax=0.05)
-            #e = self._calcEnergyWithG16(mol, conformerId, 'B3LYP', "sto-3g")
+            if optimization:
+                e = self._geomOptimization(mol, conformerId)
+            else:
+                if mmCalculator:
+                    e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
+                else:
+                    e = self._calcSPEnergy(mol, conformerId)
+
             if i == 0:
                 minE = e
                 minEGonformerID = conformerId
@@ -132,54 +125,76 @@ class ligPrep:
         results["energy_abs"] = ff.CalcEnergy()
         return results
 
-    def _calcEnergyWithG16(self, mol, conformerId, xc, basiset):
+
+    def setG16Calculator(self, label, chk, xc, basis, scf, multiplicity, extra):
         from ase.calculators.gaussian import Gaussian
+
+        self.calculator = Gaussian(
+            label=label,
+            chk=chk,
+            xc=xc,
+            basis=basis,
+            scf=scf,
+            charge=Chem.rdmolops.GetFormalCharge(self.rw_mol),
+            mult=multiplicity,
+            extra=extra,
+        )
+
+    def setANI2XCalculator(self):
+        import torchani
+        import torch
+        print("Nuber of CUDA devices: ", torch.cuda.device_count())
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.calculator = torchani.models.ANI2x().to(device).ase()
+
+    def _calcSPEnergy(self, mol, conformerId):
+
+        if self.calculator is None:
+            print("Error: Calculator not found. Please set any calculator")
+            sys.exit(1)
 
         ase_atoms = self._rwConformer2AseAtoms(mol, conformerId)
         #  from ase.io import write
         #  write("test_ase_atoms.xyz", ase_atoms)
-
-        ase_atoms.set_calculator(
-            Gaussian(
-                label = "tempG16/gaussionSPE",
-                xc=xc,
-                basis=basiset,
-                scf="maxcycle=100",
-                #cpu="0-15",
-                nprocshared="32"
-
-            )
-        )
+        ase_atoms.set_calculator(self.calculator)
 
         return ase_atoms.get_potential_energy()
 
-    def _gemOptWithG16(self, mol, conformerId, xc, basiset, fmax=0.05):
-        from ase.calculators.gaussian import Gaussian
+    def calcSPEnergy(self, atoms):
+
+        if self.calculator is None:
+            print("Error: Calculator not found. Please set any calculator")
+            sys.exit(1)
+        atoms.set_calculator(self.calculator)
+        return atoms.get_potential_energy()
+
+    def setOptParams(self, fmax, maxiter):
+        self.maxiter = maxiter
+        self.fmax = fmax
+
+    def _geomOptimization(self, mol, conformerId):
         from ase.optimize import BFGS
 
+        if self.calculator is None:
+            print("Error: Calculator not found. Please set any calculator")
+            sys.exit(1)
+
+
         ase_atoms = self._rwConformer2AseAtoms(mol, conformerId)
         #  from ase.io import write
         #  write("test_ase_atoms.xyz", ase_atoms)
 
-        ase_atoms.set_calculator(
-            Gaussian(
-                label = "tempG16/gaussionSPE",
-                xc=xc,
-                basis=basiset,
-                scf="maxcycle=100",
-                #cpu="0-15",
-                nprocshared="24"
+        if self.fmax is None or self.maxiter is None:
+            print("Error setting geometry optimizatian parameters for ASE. Please do it")
+            exit(1)
 
-            )
-        )
 
+        ase_atoms.set_calculator(self.calculator)
         dyn = BFGS(ase_atoms)
-        dyn.run(fmax,steps=self.maxcycle)
+        dyn.run(fmax=self.fmax,steps=self.maxiter)
 
         return ase_atoms.get_potential_energy()
-    
-    def setMaxCycle(self, maxcycle):
-        self.maxcycle = maxcycle
 
     def _rwConformer2AseAtoms(self, mol, conformerId):
         from ase import Atoms
@@ -190,6 +205,7 @@ class ligPrep:
         positions = mol.GetPositions()
 
         return Atoms(atom_species, positions)
+
 
 #      def alignMols(self, mol):
 #          rdkit.Chem.rdMolAlign.AlignMol(mol, self.rw_mol)
