@@ -7,6 +7,7 @@ import os, sys
 
 parser = argparse.ArgumentParser(description="Give something ...")
 parser.add_argument("structure_dir", type=str)
+parser.add_argument("add_hydrogen", nargs="?", default=False) # args for bool
 parser.add_argument("calculator_type", type=str)
 parser.add_argument("optimization", nargs="?", default=False) # args for bool
 parser.add_argument("thr_fmax", type=float, default=0.05)
@@ -25,6 +26,12 @@ if "true" in optimization or "yes" in optimization:
     optimization = True
 else:
     optimization = False
+
+add_hydrogen = args.add_hydrogen.lower()
+if "true" in add_hydrogen or "yes" in add_hydrogen:
+    add_hydrogen = True
+else:
+    add_hydrogen = False
 
 thr_fmax = args.thr_fmax
 maxiter = args.maxiter
@@ -54,6 +61,10 @@ def run(mol_path):
     # initialize ligPrep
     lig = ligPrep(mol_path)
     #  lig.writeRWMol2File("test/test.xyz")
+
+    # if desire adding H by rdkit
+    if add_hydrogen:
+        lig.addHwithRD()
 
     # defaul mm calculator set to False
     mmCalculator=False
