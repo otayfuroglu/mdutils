@@ -37,10 +37,10 @@ class ligPrep:
         if self._getFileFormat() != "mol2":
             print("Error: File fomat is NOT mol2")
             sys.exit(1)
-        self.rw_mol = Chem.rdmolfiles.MolFromMol2File(self.mol_path)
+        self.rw_mol = Chem.rdmolfiles.MolFromMol2File(self.mol_path, removeHs=False)
 
 
-    def _addHwithRD(self):
+    def addHwithRD(self):
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
 
     def _rmFileExist(self, file_path):
@@ -51,7 +51,7 @@ class ligPrep:
     def writeRWMol2File(self, file_path):
 
         # add missing H
-        self._addHwithRD()
+        #  self.addHwithRD()
 
         file_format = self._getFileFormat(file_path)
 
@@ -75,7 +75,7 @@ class ligPrep:
 
         import copy
 
-        self._addHwithRD()
+        #  self.addHwithRD()
         mol = copy.deepcopy(self.rw_mol)
 
         confs = rdkit.Chem.AllChem.EmbedMultipleConfs(
