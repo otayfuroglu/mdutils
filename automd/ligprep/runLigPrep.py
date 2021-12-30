@@ -7,9 +7,11 @@ import os, sys
 
 parser = argparse.ArgumentParser(description="Give something ...")
 parser.add_argument("structure_dir", type=str)
-parser.add_argument("add_hydrogen", nargs="?", default=False) # args for bool
+parser.add_argument("add_hydrogen", nargs="?", default="No") # args for bool
 parser.add_argument("calculator_type", type=str)
-parser.add_argument("optimization", nargs="?", default=False) # args for bool
+parser.add_argument("optimization_conf", nargs="?", default="No") # args for bool
+parser.add_argument("optimization_lig", nargs="?", default="No") # args for bool
+parser.add_argument("genconformer", nargs="?", default="No") # args for bool
 parser.add_argument("thr_fmax", type=float, default=0.05)
 parser.add_argument("maxiter", type=float, default=500)
 
@@ -21,17 +23,21 @@ args = parser.parse_args()
 structure_dir = args.structure_dir
 calculator_type = args.calculator_type
 
-optimization = args.optimization.lower()
-if "true" in optimization or "yes" in optimization:
-    optimization = True
-else:
-    optimization = False
+def getBoolStr(string):
+    string = string.lower()
+    if "true" in string or "yes" in string:
+        return True
+    elif "false" in string or "no" in string:
+        return False
+    else:
+        print("%s is bad input!!! Must be Yes/No or True/False" %string)
+        sys.exit(1)
 
-add_hydrogen = args.add_hydrogen.lower()
-if "true" in add_hydrogen or "yes" in add_hydrogen:
-    add_hydrogen = True
-else:
-    add_hydrogen = False
+
+optimization_conf = getBoolStr(args.optimization_conf)
+optimization_lig = getBoolStr(args.optimization_lig)
+genconformer = getBoolStr(args.genconformer)
+add_hydrogen = getBoolStr(args.add_hydrogen)
 
 thr_fmax = args.thr_fmax
 maxiter = args.maxiter
@@ -42,24 +48,30 @@ num_conformers = args.num_conformers
 max_attempts = args.max_attempts
 prune_rms_thresh = args.prune_rms_thresh
 
-def setG16calculator(lig, file_base):
+def setG16calculator(lig, file_base, WORK_DIR):
     lig.setG16Calculator(
-            label="tmp/g16_%s"%file_base,
-            chk="g16_%s.chk"%file_base,
-            xc="B3LYP",
+            label="%s/g16_calculation/%s"%(WORK_DIR, file_base),
+            chk="%s.chk"%file_base,
+            xc="HF",
             basis="sto-3g",
             scf="maxcycle=100",
-            multiplicity=1,
-            extra="Pop=(MK)",
+            extra="Pop=(MK) IOP(6/50=1)",
+            addsec="%s.esp"%file_base,
     )
     return lig
 
 
-def run(mol_path):
-    file_base = mol_path.split("/")[-1].replace(".mol2", "")
+def runLigPrep(file_base):
+    "Starting ligand preparetion process... "
+    mol_path= "%s/%s.mol2"%(structure_dir, file_base)
+
+    #create destination directory
+    WORK_DIR = file_base
+    if not os.path.exists(WORK_DIR):
+        os.mkdir(WORK_DIR)
 
     # initialize ligPrep
-    lig = ligPrep(mol_path)
+    lig = ligPrep(mol_path, WORK_DIR)
     #  lig.writeRWMol2File("test/test.xyz")
 
     # if desire adding H by rdkit
@@ -76,51 +88,62 @@ def run(mol_path):
         sp4esp = False
         lig = setG16calculator(lig, file_base)
     elif "uff" in calculator_type.lower():
-        if optimization:
+        if optimization_conf:
             print("UFF calculator not support optimization")
             sys.exit(1)
         else:
             mmCalculator=True
 
-    if optimization:
-        lig.setOptParams(fmax=0.05, maxiter=1000)
+    #  if optimization_conf:
+    # set optimizetion parameters
+    lig.setOptParams(fmax=thr_fmax, maxiter=1000)
 
-    out_file_path="minE_conformer_%s.sdf"%file_base
-    lig.genMinEGonformer(file_path=out_file_path,
-                         numConfs=num_conformers,
-                         maxAttempts=max_attempts,
-                         pruneRmsThresh=prune_rms_thresh,
-                         mmCalculator=mmCalculator,
-                         optimization=optimization,
-                        )
+
+    prefix = ""
+    if optimization_lig or optimization_conf:
+        prefix = "opt_"
+    out_file_path="%s/%sminE_conformer.xyz"%(WORK_DIR, prefix)
+    if genconformer:
+        ase_atoms = lig.genMinEGonformer(
+            file_path=out_file_path,
+            numConfs=num_conformers,
+            maxAttempts=max_attempts,
+            pruneRmsThresh=prune_rms_thresh,
+            mmCalculator=mmCalculator,
+            optimization_conf=optimization_conf,
+        )
+
+        print("Conformer generation process is done")
+        print("Selected minimun energy conformer")
+        if  not optimization_conf and optimization_lig:
+            print("Optimization for minumum energy conformer")
+            lig.geomOptimization(ase_atoms)
+            lig.writeAseAtoms(out_file_path)
+        else:
+            lig.writeAseAtoms(out_file_path)
+
+    else:
+        # geometry optimizaton for ligand
+        if  optimization_lig:
+            ase_atoms = lig.rwMol2AseAtoms()
+            lig.geomOptimization(ase_atoms)
+        # ligad coordintes write to xyz file
+        lig.writeAseAtoms(out_file_path)
+
 
     if sp4esp:
         from ase.io import read
         atoms = read(out_file_path)
 
-        lig = setG16calculator(lig, file_base)
+        lig = setG16calculator(lig, file_base, WORK_DIR)
         lig.calcSPEnergy(atoms)
 
-file_names = os.listdir(structure_dir)
-for file_name in file_names:
-    mol_path= "%s/%s"%(structure_dir, file_name)
-    run(mol_path)
-#
-#      start = time.time()
-#
-#      mol_path= "./test/untested/%s"%file_name
-#      lig = ligPrep(mol_path)
-#      lig.setMaxCycle(250)
-#      lig.genMinEGonformer("minE_conformer/minE_conformer_%s"%file_name)
-#
-#      spend_time =(time.time() - start) / 60.0
-#      print("time: {0:.2f} minute".format(spend_time))
-#
+def main():
+    file_names = [item for item in os.listdir(structure_dir) if item.endswith(".mol2")]
+    for file_name in file_names:
+        file_base = file_name.replace(".mol2", "")
+        runLigPrep(file_base)
+        os.system("bash ligPrep_utils.sh %s" %file_base)
 
-#  lig.convertFileFormat("mol2", "./test/convetedFile.mol2")
-#  lig.writeOBMol2File("mol", "test/test_removeH.mol")
-#  lig.addHWithOB()
-#  lig.writeOBMol2File("mol", "test/test.mol")
-#  lig.getObmolFromRWmol()
-#  lig.writeRWMol2File("./test/test.pdb")
-#  lig.printTest()
+if __name__ == "__main__":
+    main()
