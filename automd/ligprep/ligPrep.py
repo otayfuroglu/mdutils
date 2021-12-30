@@ -2,19 +2,24 @@
 
 #  import openbabel
 #  from openbabel import pybel
+from ase import Atoms
+from ase.io import write
+from ase.optimize import BFGS
+
 import rdkit
 from  rdkit import Chem
 from  rdkit.Chem import AllChem
 import os_util
-import sys
+import sys, os
 
 class ligPrep:
     """
 
     """
 
-    def __init__(self, mol_path):
+    def __init__(self, mol_path, WORK_DIR):
         self.mol_path = mol_path
+        self.WORK_DIR = WORK_DIR
 
         # initialize RW mol
         self.rw_mol = None
@@ -39,7 +44,6 @@ class ligPrep:
             sys.exit(1)
         self.rw_mol = Chem.rdmolfiles.MolFromMol2File(self.mol_path, removeHs=False)
 
-
     def addHwithRD(self):
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
 
@@ -63,12 +67,19 @@ class ligPrep:
             print("Unknown file format")
             sys.exit(1)
 
+    def _writeConf2File(self, mol, conformerId, file_path):
+        with rdkit.Chem.SDWriter(file_path) as w:
+            w.write(mol, conformerId)
+            w.flush()
+            w.close()
+
     def genMinEGonformer(self, file_path,
                          numConfs=20,
                          maxAttempts=1000,
                          pruneRmsThresh=0.1,
                          mmCalculator=False,
-                         optimization=False,
+                         optimization_conf=False,
+                         saveConfs=True,
                          useExpTorsionAnglePrefs=True,
                          useBasicKnowledge=True,
                          enforceChirality=True):
@@ -89,9 +100,22 @@ class ligPrep:
             numThreads=0,
         )
 
+        print("Number of generated conformation: %d" %len(confs))
         for i, conformerId  in enumerate(confs):
-            if optimization:
-                e = self._geomOptimization(mol, conformerId)
+            print("%d. conformer processing..." %i)
+            if saveConfs:
+                CONF_DIR = self.WORK_DIR + "/conformers"
+                if not os.path.exists(CONF_DIR):
+                    os.mkdir(CONF_DIR)
+
+                prefix = ""
+                if optimization_conf:
+                    prefix = "opt_"
+                conf_file_path = "%s/%sconf_%d.sdf"%(CONF_DIR, prefix, i)
+                self._writeConf2File(mol, conformerId, conf_file_path)
+
+            if optimization_conf:
+                e, ase_atoms = self._geomOptimizationConf(mol, conformerId)
             else:
                 if mmCalculator:
                     e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
@@ -106,11 +130,14 @@ class ligPrep:
                     minE = e
                     minEGonformerID = conformerId
         #  print(minE, minEGonformerID)
+        #  if numConfs > 1:
+        #  if not optimization_conf:
+        #      _, ase_atoms = self._geomOptimizationConf(mol, minEGonformerID)
+        #  else:
+        #      ase_atoms = self._rwConformer2AseAtoms(mol, minEGonformerID)
 
-        with rdkit.Chem.SDWriter(file_path) as w:
-            w.write(mol, minEGonformerID)
-            w.flush()
-            w.close()
+
+        return self._rwConformer2AseAtoms(mol, minEGonformerID)
 
     def _calcEnergyWithMM(self, mol, conformerId, minimizeIts):
         ff = rdkit.Chem.AllChem.MMFFGetMoleculeForceField(
@@ -125,8 +152,7 @@ class ligPrep:
         results["energy_abs"] = ff.CalcEnergy()
         return results
 
-
-    def setG16Calculator(self, label, chk, xc, basis, scf, multiplicity, extra):
+    def setG16Calculator(self, label, chk, xc, basis, scf, addsec, extra):
         from ase.calculators.gaussian import Gaussian
 
         self.calculator = Gaussian(
@@ -135,8 +161,7 @@ class ligPrep:
             xc=xc,
             basis=basis,
             scf=scf,
-            charge=Chem.rdmolops.GetFormalCharge(self.rw_mol),
-            mult=multiplicity,
+            addsec=addsec,
             extra=extra,
         )
 
@@ -173,8 +198,7 @@ class ligPrep:
         self.maxiter = maxiter
         self.fmax = fmax
 
-    def _geomOptimization(self, mol, conformerId):
-        from ase.optimize import BFGS
+    def _geomOptimizationConf(self, mol, conformerId):
 
         if self.calculator is None:
             print("Error: Calculator not found. Please set any calculator")
@@ -194,10 +218,27 @@ class ligPrep:
         dyn = BFGS(ase_atoms)
         dyn.run(fmax=self.fmax,steps=self.maxiter)
 
-        return ase_atoms.get_potential_energy()
+        return ase_atoms.get_potential_energy(), ase_atoms
+
+    def geomOptimization(self, ase_atoms):
+
+        if self.calculator is None:
+            print("Error: Calculator not found. Please set any calculator")
+            sys.exit(1)
+
+
+        if self.fmax is None or self.maxiter is None:
+            print("Error setting geometry optimizatian parameters for ASE. Please do it")
+            exit(1)
+
+
+        ase_atoms.set_calculator(self.calculator)
+        dyn = BFGS(ase_atoms)
+        dyn.run(fmax=self.fmax,steps=self.maxiter)
+
+        return ase_atoms.get_potential_energy(), ase_atoms
 
     def _rwConformer2AseAtoms(self, mol, conformerId):
-        from ase import Atoms
 
         mol = mol.GetConformer(conformerId)
 
@@ -205,6 +246,22 @@ class ligPrep:
         positions = mol.GetPositions()
 
         return Atoms(atom_species, positions)
+
+    def rwMol2AseAtoms(self):
+
+        atom_species = [atom.GetAtomicNum() for atom in self.rw_mol.GetAtoms()]
+
+        conf = self.rw_mol.GetConformer()
+        positions = [conf.GetAtomPosition(i) for i in range(len(atom_species))]
+        #  positions = self.rw_mol.GetConformers()[0].GetPositions()
+
+        return Atoms(atom_species, positions)
+
+    def writeAseAtoms(self, file_path):
+        ase_atoms = self.rwMol2AseAtoms()
+
+        # write mol to xyz file by ase
+        write(file_path, ase_atoms)
 
 
 #      def alignMols(self, mol):
