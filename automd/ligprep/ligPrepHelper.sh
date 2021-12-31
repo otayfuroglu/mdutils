@@ -22,14 +22,17 @@ quit
 EOF
 
 amb2gro_top_gro.py -p "$lig".prmtop -c "$lig".inpcrd -t "$lig"_GMX.top -g "$lig"_GMX.gro -b "$lig"_GMX.pdb
-gmx editconf -f "$lig"_GMX.pdb -o "$lig".gro
-# rm topol.top
 
-cp ../templates/topol.top topol.top
-sed -n '/atomtypes/,/moleculetype/{/moleculetype/b;p}' "$lig"_GMX.top > "$lig"_GMX_GAFF.rtp
-sed -n '/moleculetype/,/system/{/system/b;p}' "$lig"_GMX.top > "$lig"_GMX.itp
-sed -i s/LIGAND/"$lig"/g topol.top
+# for MD prepration
 
+# gmx editconf -f "$lig"_GMX.pdb -o "$lig".gro
+# # rm topol.top
+#
+# cp ../templates/topol.top topol.top
+# sed -n '/atomtypes/,/moleculetype/{/moleculetype/b;p}' "$lig"_GMX.top > "$lig"_GMX_GAFF.rtp
+# sed -n '/moleculetype/,/system/{/system/b;p}' "$lig"_GMX.top > "$lig"_GMX.itp
+# sed -i s/LIGAND/"$lig"/g topol.top
+#
 # echo 0 | gmx genrestr -f "$lig".gro -o posre_ligand.itp -fc 1000 1000 1000
 # gmx editconf -f "$lig".gro -o newbox.gro -bt dodecahedron -d 1.0 -center 1.5 1.5 1.0
 # gmx solvate -cp newbox.gro -cs spc216.gro -p topol.top -o solv.gro
