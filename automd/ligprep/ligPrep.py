@@ -48,7 +48,6 @@ class ligPrep:
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
 
     def _rmFileExist(self, file_path):
-        import os
         if os.path.exists(file_path):
             os.remove(file_path)
 
@@ -63,6 +62,10 @@ class ligPrep:
             rdkit.Chem.rdmolfiles.MolToXYZFile(self.rw_mol, file_path)
         elif file_format == "pdb":
             rdkit.Chem.rdmolfiles.MolToPDBFile(self.rw_mol, file_path)
+        elif file_format == "sdf":
+            with Chem.rdmolfiles.SDWriter(file_path) as writer:
+                writer.write(self.rw_mol)
+
         else:
             print("Unknown file format")
             sys.exit(1)
@@ -117,6 +120,8 @@ class ligPrep:
             if optimization_conf:
                 e, ase_atoms = self._geomOptimizationConf(mol, conformerId)
             else:
+                #create ase atoms
+                ase_atoms = self._rwConformer2AseAtoms(mol, conformerId)
                 if mmCalculator:
                     e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
                 else:
@@ -124,11 +129,13 @@ class ligPrep:
 
             if i == 0:
                 minE = e
-                minEGonformerID = conformerId
+                #  minEGonformerID = conformerId
+                minE_ase_atoms = ase_atoms
             else:
                 if minE > e:
                     minE = e
-                    minEGonformerID = conformerId
+                    #  minEGonformerID = conformerId
+                    minE_ase_atoms = ase_atoms
         #  print(minE, minEGonformerID)
         #  if numConfs > 1:
         #  if not optimization_conf:
@@ -136,8 +143,10 @@ class ligPrep:
         #  else:
         #      ase_atoms = self._rwConformer2AseAtoms(mol, minEGonformerID)
 
+        # assign minE conformer to self rw mol
+        self._rw_mol = self.aseAtoms2rwMol(minE_ase_atoms)
 
-        return self._rwConformer2AseAtoms(mol, minEGonformerID)
+        return minE_ase_atoms
 
     def _calcEnergyWithMM(self, mol, conformerId, minimizeIts):
         ff = rdkit.Chem.AllChem.MMFFGetMoleculeForceField(
@@ -225,18 +234,17 @@ class ligPrep:
         if self.calculator is None:
             print("Error: Calculator not found. Please set any calculator")
             sys.exit(1)
-
-
         if self.fmax is None or self.maxiter is None:
             print("Error setting geometry optimizatian parameters for ASE. Please do it")
             exit(1)
-
 
         ase_atoms.set_calculator(self.calculator)
         dyn = BFGS(ase_atoms)
         dyn.run(fmax=self.fmax,steps=self.maxiter)
 
-        return ase_atoms.get_potential_energy(), ase_atoms
+        self._rw_mol = self.aseAtoms2rwMol(ase_atoms)
+
+        #  return ase_atoms.get_potential_energy(), ase_atoms
 
     def _rwConformer2AseAtoms(self, mol, conformerId):
 
@@ -256,6 +264,13 @@ class ligPrep:
         #  positions = self.rw_mol.GetConformers()[0].GetPositions()
 
         return Atoms(atom_species, positions)
+
+    def aseAtoms2rwMol(self, ase_atoms):
+
+        write("tmp.pdb", ase_atoms)
+        rw_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb")
+        self._rmFileExist("tmp.xyz")
+        return rw_mol
 
     def writeAseAtoms(self, file_path):
         ase_atoms = self.rwMol2AseAtoms()
