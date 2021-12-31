@@ -7,7 +7,7 @@ file_base=$1
 cd $file_base
 
 lig=MOL
-cp g16_calculation/$file_base.esp $lig.esp
+cp g16_esp_calculation/$file_base.esp $lig.esp
 
 # rm *.gro *.top *.itp *.rtp *.ndx
 antechamber -i "$lig".esp -fi gesp -o "$lig".prepin -fo prepi -c resp -s 2 -rn "$lig" -at gaff -nc 0 -pf yes
