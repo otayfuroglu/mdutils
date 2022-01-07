@@ -62,10 +62,11 @@ def setG16calculator(lig, file_base, label, WORK_DIR):
     return lig
 
 
-def runLigPrep(file_base):
+def runLigPrep(file_name):
     "Starting ligand preparetion process... "
-    mol_path= "%s/%s.mol2"%(structure_dir, file_base)
+    mol_path= "%s/%s"%(structure_dir, file_name)
 
+    file_base = file_name.split(".")[0]
     #create destination directory
     WORK_DIR = file_base
     if not os.path.exists(WORK_DIR):
@@ -75,8 +76,16 @@ def runLigPrep(file_base):
     # defaul mm calculator set to False
     mmCalculator=False
 
+    # if desire adding H by openbabel
+    prefix = ""
+    if add_hydrogen:
+        addH = True
+        prefix += "addH_"
+    else:
+        addH = False
+
     # initialize ligPrep
-    lig = ligPrep(mol_path, WORK_DIR)
+    lig = ligPrep(mol_path, addH, WORK_DIR)
     #  lig.writeRWMol2File("test/test.xyz")
 
     if "ani2x" in calculator_type.lower():
@@ -89,12 +98,6 @@ def runLigPrep(file_base):
             sys.exit(1)
         else:
             mmCalculator=True
-
-    # if desire adding H by rdkit
-    prefix = ""
-    if add_hydrogen:
-        lig.addHwithRD()
-        prefix += "addH_"
 
     #  if optimization_conf:
     # set optimizetion parameters
@@ -133,10 +136,10 @@ def runLigPrep(file_base):
     lig.calcSPEnergy(atoms)
 
 def main():
-    file_names = [item for item in os.listdir(structure_dir) if item.endswith(".mol2")]
+    file_names = [item for item in os.listdir(structure_dir) if not item.startswith(".")]
     for file_name in file_names:
-        file_base = file_name.replace(".mol2", "")
-        runLigPrep(file_base)
+        file_base = file_name.split(".")[0]
+        runLigPrep(file_name)
         os.system("bash ligPrepHelper.sh %s" %file_base)
 
 if __name__ == "__main__":
