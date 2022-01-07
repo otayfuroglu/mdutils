@@ -1,7 +1,5 @@
-
-
-#  import openbabel
-#  from openbabel import pybel
+#
+from openbabel import openbabel
 from ase import Atoms
 from ase.io import write
 from ase.optimize import BFGS
@@ -17,9 +15,12 @@ class ligPrep:
 
     """
 
-    def __init__(self, mol_path, WORK_DIR):
+    def __init__(self, mol_path, addH, WORK_DIR):
         self.mol_path = mol_path
         self.WORK_DIR = WORK_DIR
+
+        # set add missing H
+        self.addH = addH
 
         # initialize RW mol
         self.rw_mol = None
@@ -39,10 +40,35 @@ class ligPrep:
         return self.mol_path.split(".")[-1]
 
     def _loadRWMol(self):
-        if self._getFileFormat() != "mol2":
-            print("Error: File fomat is NOT mol2")
-            sys.exit(1)
-        self.rw_mol = Chem.rdmolfiles.MolFromMol2File(self.mol_path, removeHs=False)
+        if self._getFileFormat() == "mol2":
+            self._loadMolWithRW(self.mol_path)
+        else:
+            self._loadMolWithOB()
+
+
+    def _loadMolWithRW(self, mol_path):
+        self.rw_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, removeHs=False)
+
+    def _loadMolWithOB(self):
+
+        obConversion = openbabel.OBConversion()
+        obConversion.SetInAndOutFormats(self._getFileFormat(), "mol2")
+        ob_mol = openbabel.OBMol()
+        obConversion.ReadFile(ob_mol, self.mol_path)
+
+        #add hydrogen with openbabel
+        if self.addH:
+           ob_mol.AddHydrogens()
+
+        # openbabel file to rdkit mol2 file
+        temp_file_name = "temp_ob_file.mol2"
+        obConversion.WriteFile(ob_mol, temp_file_name)
+
+        # laod as RW file
+        self._loadMolWithRW(temp_file_name)
+
+        # remove temp
+        self._rmFileExist(temp_file_name)
 
     def addHwithRD(self):
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
