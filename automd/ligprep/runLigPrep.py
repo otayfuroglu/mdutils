@@ -89,7 +89,8 @@ def runLigPrep(file_name):
     #  lig.writeRWMol2File("test/test.xyz")
 
     if "ani2x" in calculator_type.lower():
-        lig.setANI2XCalculator()
+        if optimization_lig or optimization_conf:
+            lig.setANI2XCalculator()
     elif "g16" in calculator_type.lower():
         lig = setG16calculator(lig, file_base, label="calculation", WORK_DIR=WORK_DIR)
     elif "uff" in calculator_type.lower():
@@ -140,7 +141,7 @@ def main():
     for file_name in file_names:
         file_base = file_name.split(".")[0]
         runLigPrep(file_name)
-        os.system("bash ligPrepHelper.sh %s" %file_base)
+        #  os.system("bash ligPrepHelper.sh %s" %file_base)
 
 if __name__ == "__main__":
     main()
