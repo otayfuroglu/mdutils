@@ -141,7 +141,7 @@ def main():
     for file_name in file_names:
         file_base = file_name.split(".")[0]
         runLigPrep(file_name)
-        #  os.system("bash ligPrepHelper.sh %s" %file_base)
+        os.system("bash ligPrepHelper.sh %s" %file_base)
 
 if __name__ == "__main__":
     main()
