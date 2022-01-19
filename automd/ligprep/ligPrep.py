@@ -7,7 +7,7 @@ from ase.optimize import BFGS
 import rdkit
 from  rdkit import Chem
 from  rdkit.Chem import AllChem
-import os_util
+#  import os_util
 import sys, os
 
 class ligPrep:
@@ -40,7 +40,7 @@ class ligPrep:
         return self.mol_path.split(".")[-1]
 
     def _loadRWMol(self):
-        if self._getFileFormat() == "mol2":
+        if self._getFileFormat() == "mol2" and not self.addH:
             self._loadMolWithRW(self.mol_path)
         else:
             self._loadMolWithOB()
@@ -58,17 +58,20 @@ class ligPrep:
 
         #add hydrogen with openbabel
         if self.addH:
-           ob_mol.AddHydrogens()
+            if self._getFileFormat() == "xyz":
+                print("Error: Cannot add hydrogen atoms to XYZ file format!!!")
+                exit(1)
+            ob_mol.AddHydrogens()
 
         # openbabel file to rdkit mol2 file
-        temp_file_name = "temp_ob_file.mol2"
-        obConversion.WriteFile(ob_mol, temp_file_name)
+        tmp_file_name = "tmp_ob_file.mol2"
+        obConversion.WriteFile(ob_mol, tmp_file_name)
 
         # laod as RW file
-        self._loadMolWithRW(temp_file_name)
+        self._loadMolWithRW(tmp_file_name)
 
         # remove temp
-        self._rmFileExist(temp_file_name)
+        self._rmFileExist(tmp_file_name)
 
     def addHwithRD(self):
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
@@ -295,7 +298,7 @@ class ligPrep:
 
         write("tmp.pdb", ase_atoms)
         rw_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb")
-        self._rmFileExist("tmp.xyz")
+        self._rmFileExist("tmp.pdb")
         return rw_mol
 
     def writeAseAtoms(self, file_path):

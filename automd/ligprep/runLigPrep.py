@@ -90,7 +90,8 @@ def runLigPrep(file_name):
     #  lig.writeRWMol2File("test/test.xyz")
 
     if "ani2x" in calculator_type.lower():
-        lig.setANI2XCalculator()
+        if optimization_lig or optimization_conf:
+            lig.setANI2XCalculator()
     elif "g16" in calculator_type.lower():
         lig = setG16calculator(lig, file_base, label="calculation", WORK_DIR=WORK_DIR)
     elif "uff" in calculator_type.lower():
