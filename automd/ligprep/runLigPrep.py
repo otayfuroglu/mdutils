@@ -119,7 +119,7 @@ def runLigPrep(file_name):
 
         print("Conformer generation process is done")
         print("Selected minimun energy conformer")
-        if  not optimization_conf and optimization_lig:
+        if not optimization_conf and optimization_lig:
             print("Optimization for minumum energy conformer")
             lig.geomOptimization(minE_ase_atoms)
     else:
@@ -129,11 +129,21 @@ def runLigPrep(file_name):
             ase_atoms = lig.rwMol2AseAtoms()
             lig.geomOptimization(ase_atoms)
 
+    # write minimun energy conformer to sdf file
     lig.writeRWMol2File(out_file_path)
 
-    # g16 calculation for generate ESP chage
+    ### g16 calculation for generate ESP chage ###
+    # for the bug of reading sfd file which have charges in ase
+    #  try:
+    #      atoms = read(out_file_path)
+    #  except:
+    #      out_file_path="%s/%s%s.xyz"%(WORK_DIR, prefix, file_base)
+    #      lig.writeRWMol2File(out_file_path)
+    #      atoms = read(out_file_path)
+
+    atoms = lig.rwMol2AseAtoms()
+
     label="esp_calculation"
-    atoms = read(out_file_path)
     lig = setG16calculator(lig, file_base, label=label, WORK_DIR=WORK_DIR)
 
     # for the bug of reading gaussian calculation log file in ase
