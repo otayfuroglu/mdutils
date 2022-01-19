@@ -2,7 +2,7 @@
 from ase.io import read
 from ligPrep import ligPrep
 import argparse
-import os, sys
+import os, sys, shutil
 
 
 
@@ -69,8 +69,9 @@ def runLigPrep(file_name):
     file_base = file_name.split(".")[0]
     #create destination directory
     WORK_DIR = file_base
-    if not os.path.exists(WORK_DIR):
-        os.mkdir(WORK_DIR)
+    if os.path.exists(WORK_DIR):
+        shutil.rmtree(WORK_DIR)
+    os.mkdir(WORK_DIR)
 
     #Flags
     # defaul mm calculator set to False
@@ -131,9 +132,20 @@ def runLigPrep(file_name):
     lig.writeRWMol2File(out_file_path)
 
     # g16 calculation for generate ESP chage
+    label="esp_calculation"
     atoms = read(out_file_path)
-    lig = setG16calculator(lig, file_base, label="esp_calculation", WORK_DIR=WORK_DIR)
-    lig.calcSPEnergy(atoms)
+    lig = setG16calculator(lig, file_base, label=label, WORK_DIR=WORK_DIR)
+
+    # for the bug of reading gaussian calculation log file in ase
+    try:
+        lig.calcSPEnergy(atoms)
+    except:
+        if os.path.exists(WORK_DIR + "/g16_" + label + "/" + file_base + ".esp"):
+            pass
+        else:
+            print("Error: Could not generated ESP charges..")
+            sys.exit(1)
+
 
 def main():
     file_names = [item for item in os.listdir(structure_dir) if not item.startswith(".")]
