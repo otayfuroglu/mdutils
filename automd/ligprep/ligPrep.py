@@ -69,9 +69,14 @@ class ligPrep:
 
         # laod as RW file
         self._loadMolWithRW(tmp_file_name)
-
         # remove temp
         self._rmFileExist(tmp_file_name)
+
+        # optmization for just added H
+        self.setOptParams(fmax=0.01, maxiter=1000)
+        self.setANI2XCalculator()
+        ase_atoms = self.rwMol2AseAtoms()
+        self.geomOptimization(ase_atoms, fix_heavy_atoms=True)
 
     def addHwithRD(self):
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
@@ -258,7 +263,7 @@ class ligPrep:
 
         return ase_atoms.get_potential_energy(), ase_atoms
 
-    def geomOptimization(self, ase_atoms):
+    def geomOptimization(self, ase_atoms, fix_heavy_atoms=False):
 
         if self.calculator is None:
             print("Error: Calculator not found. Please set any calculator")
@@ -266,6 +271,11 @@ class ligPrep:
         if self.fmax is None or self.maxiter is None:
             print("Error setting geometry optimizatian parameters for ASE. Please do it")
             exit(1)
+
+        if fix_heavy_atoms:
+            from ase.constraints import FixAtoms
+            c = FixAtoms(indices=[atom.index for atom in ase_atoms if atom.symbol != 'H'])
+            ase_atoms.set_constraint(c)
 
         ase_atoms.set_calculator(self.calculator)
         dyn = BFGS(ase_atoms)
