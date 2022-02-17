@@ -271,7 +271,8 @@ class ligPrep:
         dyn = BFGS(ase_atoms)
         dyn.run(fmax=self.fmax,steps=self.maxiter)
 
-        self._rw_mol = self.aseAtoms2rwMol(ase_atoms)
+        self.rw_mol = self.aseAtoms2rwMol(ase_atoms)
+
 
         #  return ase_atoms.get_potential_energy(), ase_atoms
 
@@ -297,7 +298,7 @@ class ligPrep:
     def aseAtoms2rwMol(self, ase_atoms):
 
         write("tmp.pdb", ase_atoms)
-        rw_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb")
+        rw_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb", removeHs=False)
         self._rmFileExist("tmp.pdb")
         return rw_mol
 
