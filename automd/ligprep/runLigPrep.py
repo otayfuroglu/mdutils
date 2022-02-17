@@ -74,16 +74,16 @@ def runLigPrep(file_name):
     os.mkdir(WORK_DIR)
 
     #Flags
-    # defaul mm calculator set to False
+    # default mm calculator set to False
     mmCalculator=False
+    # default adding H is False
+    addH = False
 
     # if desire adding H by openbabel
     prefix = ""
     if add_hydrogen:
         addH = True
         prefix += "addH_"
-    else:
-        addH = False
 
     # initialize ligPrep
     lig = ligPrep(mol_path, addH, WORK_DIR)
