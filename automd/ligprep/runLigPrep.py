@@ -54,7 +54,7 @@ def setG16calculator(lig, file_base, label, WORK_DIR):
             label="%s/g16_%s/%s"%(WORK_DIR, label, file_base),
             chk="%s.chk"%file_base,
             xc="HF",
-            basis="sto-3g",
+            basis="6-31g*",
             scf="maxcycle=100",
             extra="Pop=(MK) IOP(6/50=1)",
             addsec="%s.esp"%file_base,
