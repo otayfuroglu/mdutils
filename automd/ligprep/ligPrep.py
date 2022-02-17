@@ -45,7 +45,6 @@ class ligPrep:
         else:
             self._loadMolWithOB()
 
-
     def _loadMolWithRW(self, mol_path):
         self.rw_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, removeHs=False)
 
@@ -63,19 +62,21 @@ class ligPrep:
                 exit(1)
             ob_mol.AddHydrogens()
 
-        # openbabel file to rdkit mol2 file
-        tmp_file_name = "tmp_ob_file.mol2"
-        obConversion.WriteFile(ob_mol, tmp_file_name)
+        # NOTE: deprecated
+        #  # openbabel file to rdkit mol2 file
+        #  tmp_file_name = "tmp_ob_file.mol2"
+        #  obConversion.WriteFile(ob_mol, tmp_file_name)
 
-        # laod as RW file
-        self._loadMolWithRW(tmp_file_name)
-        # remove temp
-        self._rmFileExist(tmp_file_name)
+        #  # laod as RW file
+        #  self._loadMolWithRW(tmp_file_name)
+        #  # remove temp
+        #  self._rmFileExist(tmp_file_name)
+
+        ase_atoms = self.obMol2AseAtoms(ob_mol)
 
         # optmization for just added H
         self.setOptParams(fmax=0.01, maxiter=1000)
         self.setANI2XCalculator()
-        ase_atoms = self.rwMol2AseAtoms()
         self.geomOptimization(ase_atoms, fix_heavy_atoms=True)
 
     def addHwithRD(self):
@@ -304,6 +305,18 @@ class ligPrep:
         #  positions = self.rw_mol.GetConformers()[0].GetPositions()
 
         return Atoms(atom_species, positions)
+
+    def obMol2AseAtoms(self, ob_mol):
+        from ase import Atom
+        ase_atoms = Atoms()
+        for i in range(ob_mol.NumAtoms()):
+            obatom = ob_mol.GetAtom(i + 1)
+            ase_atoms.append(Atom(obatom.GetAtomicNum(),
+                              [obatom.GetX(),
+                               obatom.GetY(),
+                               obatom.GetZ()]
+                             ))
+        return ase_atoms
 
     def aseAtoms2rwMol(self, ase_atoms):
 
