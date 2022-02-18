@@ -84,6 +84,8 @@ def runLigPrep(file_name):
     if add_hydrogen:
         addH = True
         prefix += "addH_"
+    if optimization_lig or optimization_conf:
+        prefix += "opt_"
 
     # initialize ligPrep
     lig = ligPrep(mol_path, addH, WORK_DIR)
@@ -104,11 +106,9 @@ def runLigPrep(file_name):
     # set optimizetion parameters
     lig.setOptParams(fmax=thr_fmax, maxiter=1000)
 
-    if optimization_lig or optimization_conf:
-        prefix += "opt_"
     if genconformer:
         out_file_path="%s/%sminE_conformer.sdf"%(WORK_DIR, prefix)
-        minE_ase_atoms = lig.genMinEGonformer(
+        lig.genMinEGonformer(
             file_path=out_file_path,
             numConfs=num_conformers,
             maxAttempts=max_attempts,
@@ -118,16 +118,15 @@ def runLigPrep(file_name):
         )
 
         print("Conformer generation process is done")
-        print("Selected minimun energy conformer")
         if not optimization_conf and optimization_lig:
             print("Optimization for minumum energy conformer")
-            lig.geomOptimization(minE_ase_atoms)
+            lig.geomOptimization()
     else:
         out_file_path="%s/%s%s.sdf"%(WORK_DIR, prefix, file_base)
         # geometry optimizaton for ligand
         if  optimization_lig:
-            ase_atoms = lig.rwMol2AseAtoms()
-            lig.geomOptimization(ase_atoms)
+            #  ase_atoms = lig.rwMol2AseAtoms()
+            lig.geomOptimization()
 
     # write minimun energy conformer to sdf file
     lig.writeRWMol2File(out_file_path)
@@ -141,14 +140,14 @@ def runLigPrep(file_name):
     #      lig.writeRWMol2File(out_file_path)
     #      atoms = read(out_file_path)
 
-    atoms = lig.rwMol2AseAtoms()
+    #  atoms = lig.rwMol2AseAtoms()
 
     label="esp_calculation"
     lig = setG16calculator(lig, file_base, label=label, WORK_DIR=WORK_DIR)
 
     # for the bug of reading gaussian calculation log file in ase
     try:
-        lig.calcSPEnergy(atoms)
+        lig.calcSPEnergy()
     except:
         if os.path.exists(WORK_DIR + "/g16_" + label + "/" + file_base + ".esp"):
             pass
@@ -157,12 +156,18 @@ def runLigPrep(file_name):
             sys.exit(1)
 
 
-def main():
+if __name__ == "__main__":
     file_names = [item for item in os.listdir(structure_dir) if not item.startswith(".")]
+    failed_csv = open("failed_files.csv", "w")
+    failed_csv.write("FileNames,\n")
+
     for file_name in file_names:
         file_base = file_name.split(".")[0]
-        runLigPrep(file_name)
-        os.system("bash ligPrepHelper.sh %s" %file_base)
+        try:
+            runLigPrep(file_name)
+            os.system("bash ligPrepHelper.sh %s" %file_base)
+        except:
+            print("Error for %s file !!! Skipping...")
+            failed_csv.write(file_name+",\n")
+    failed_csv.close()
 
-if __name__ == "__main__":
-    main()
