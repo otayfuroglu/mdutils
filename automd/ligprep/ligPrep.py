@@ -2,7 +2,7 @@
 from openbabel import openbabel
 from ase import Atoms
 from ase.io import write
-from ase.optimize import BFGS
+from ase.optimize import LBFGS
 
 import rdkit
 from  rdkit import Chem
@@ -45,8 +45,8 @@ class ligPrep:
         else:
             self._loadMolWithOB()
 
-    def _loadMolWithRW(self, mol_path):
-        self.rw_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, removeHs=False)
+    def _loadMolWithRW(self, mol_path, sanitize=True):
+        self.rw_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, sanitize=sanitize, removeHs=False)
 
     def _loadMolWithOB(self):
 
@@ -62,22 +62,22 @@ class ligPrep:
                 exit(1)
             ob_mol.AddHydrogens()
 
-        # NOTE: deprecated
         #  # openbabel file to rdkit mol2 file
-        #  tmp_file_name = "tmp_ob_file.mol2"
-        #  obConversion.WriteFile(ob_mol, tmp_file_name)
+        tmp_file_name = "tmp_ob_file.mol2"
+        obConversion.WriteFile(ob_mol, tmp_file_name)
 
-        #  # laod as RW file
-        #  self._loadMolWithRW(tmp_file_name)
-        #  # remove temp
-        #  self._rmFileExist(tmp_file_name)
+        # laod as RW file
+        self._loadMolWithRW(tmp_file_name)
+        # remove temp
+        self._rmFileExist(tmp_file_name)
 
-        ase_atoms = self.obMol2AseAtoms(ob_mol)
+        # NOTE
+        #  ase_atoms = self.obMol2AseAtoms(ob_mol)
 
         # optmization for just added H
-        self.setOptParams(fmax=0.01, maxiter=1000)
+        self.setOptParams(fmax=0.05, maxiter=1000)
         self.setANI2XCalculator()
-        self.geomOptimization(ase_atoms, fix_heavy_atoms=True)
+        self.geomOptimization(fix_heavy_atoms=True)
 
     def addHwithRD(self):
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
@@ -178,10 +178,13 @@ class ligPrep:
         #  else:
         #      ase_atoms = self._rwConformer2AseAtoms(mol, minEGonformerID)
 
-        # assign minE conformer to self rw mol
-        self._rw_mol = self.aseAtoms2rwMol(minE_ase_atoms)
-
-        return minE_ase_atoms
+        # compeare initial struct and minE conf. energies
+        if self.calcSPEnergy() >  minE:
+            # assign minE conformer to self rw mol
+            self.rw_mol = self.aseAtoms2rwMol(minE_ase_atoms)
+            print("Selected minimun energy conformer")
+        else:
+            print("!!! INITIAL structure as is minimun energy conformer !!!")
 
     def _calcEnergyWithMM(self, mol, conformerId, minimizeIts):
         ff = rdkit.Chem.AllChem.MMFFGetMoleculeForceField(
@@ -230,13 +233,14 @@ class ligPrep:
 
         return ase_atoms.get_potential_energy()
 
-    def calcSPEnergy(self, atoms):
+    def calcSPEnergy(self):
 
         if self.calculator is None:
             print("Error: Calculator not found. Please set any calculator")
             sys.exit(1)
-        atoms.set_calculator(self.calculator)
-        return atoms.get_potential_energy()
+        ase_atoms= self.rwMol2AseAtoms()
+        ase_atoms.set_calculator(self.calculator)
+        return ase_atoms.get_potential_energy()
 
     def setOptParams(self, fmax, maxiter):
         self.maxiter = maxiter
@@ -259,12 +263,12 @@ class ligPrep:
 
 
         ase_atoms.set_calculator(self.calculator)
-        dyn = BFGS(ase_atoms)
+        dyn = LBFGS(ase_atoms)
         dyn.run(fmax=self.fmax,steps=self.maxiter)
 
         return ase_atoms.get_potential_energy(), ase_atoms
 
-    def geomOptimization(self, ase_atoms, fix_heavy_atoms=False):
+    def geomOptimization(self, fix_heavy_atoms=False):
 
         if self.calculator is None:
             print("Error: Calculator not found. Please set any calculator")
@@ -273,13 +277,14 @@ class ligPrep:
             print("Error setting geometry optimizatian parameters for ASE. Please do it")
             exit(1)
 
+        ase_atoms= self.rwMol2AseAtoms()
         if fix_heavy_atoms:
             from ase.constraints import FixAtoms
             c = FixAtoms(indices=[atom.index for atom in ase_atoms if atom.symbol != 'H'])
             ase_atoms.set_constraint(c)
 
         ase_atoms.set_calculator(self.calculator)
-        dyn = BFGS(ase_atoms)
+        dyn = LBFGS(ase_atoms)
         dyn.run(fmax=self.fmax,steps=self.maxiter)
 
         self.rw_mol = self.aseAtoms2rwMol(ase_atoms)
