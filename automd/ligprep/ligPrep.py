@@ -46,7 +46,8 @@ class ligPrep:
             self._loadMolWithOB()
 
     def _loadMolWithRW(self, mol_path, sanitize=True):
-        self.rw_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, sanitize=sanitize, removeHs=False)
+        rd_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, sanitize=sanitize, removeHs=False)
+        self.rw_mol = Chem.RWMol(rd_mol)
 
     def _loadMolWithOB(self):
 
@@ -75,7 +76,7 @@ class ligPrep:
         #  ase_atoms = self.obMol2AseAtoms(ob_mol)
 
         # optmization for just added H
-        self.setOptParams(fmax=0.05, maxiter=1000)
+        self.setOptParams(fmax=0.05, maxiter=200)
         self.setANI2XCalculator()
         self.geomOptimization(fix_heavy_atoms=True)
 
@@ -277,7 +278,7 @@ class ligPrep:
             print("Error setting geometry optimizatian parameters for ASE. Please do it")
             exit(1)
 
-        ase_atoms= self.rwMol2AseAtoms()
+        ase_atoms = self.rwMol2AseAtoms()
         if fix_heavy_atoms:
             from ase.constraints import FixAtoms
             c = FixAtoms(indices=[atom.index for atom in ase_atoms if atom.symbol != 'H'])
@@ -325,10 +326,13 @@ class ligPrep:
 
     def aseAtoms2rwMol(self, ase_atoms):
 
+        #  from aseAtoms2rdMol import fromASE, to_rdmol, ase2rdmol
         write("tmp.pdb", ase_atoms)
-        rw_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb", removeHs=False)
+        rd_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb", removeHs=False)
         self._rmFileExist("tmp.pdb")
-        return rw_mol
+
+        return AllChem.AssignBondOrdersFromTemplate(self.rw_mol, rd_mol)
+
 
     def writeAseAtoms(self, file_path):
         ase_atoms = self.rwMol2AseAtoms()
