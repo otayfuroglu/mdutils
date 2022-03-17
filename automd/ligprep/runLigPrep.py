@@ -131,16 +131,16 @@ def runLigPrep(file_name):
     # write minimun energy conformer to sdf file
     lig.writeRWMol2File(out_file_path)
 
-    ### g16 calculation for generate ESP chage ###
-    # for the bug of reading sfd file which have charges in ase
-    #  try:
-    #      atoms = read(out_file_path)
-    #  except:
-    #      out_file_path="%s/%s%s.xyz"%(WORK_DIR, prefix, file_base)
-    #      lig.writeRWMol2File(out_file_path)
-    #      atoms = read(out_file_path)
+    ## g16 calculation for generate ESP chage ###
+    #  for the bug of reading sfd file which have charges in ase
+    try:
+        atoms = read(out_file_path)
+    except:
+        out_file_path="%s/%s%s.xyz"%(WORK_DIR, prefix, file_base)
+        lig.writeRWMol2File(out_file_path)
+        atoms = read(out_file_path)
 
-    #  atoms = lig.rwMol2AseAtoms()
+    atoms = lig.rwMol2AseAtoms()
 
     label="esp_calculation"
     lig = setG16calculator(lig, file_base, label=label, WORK_DIR=WORK_DIR)
@@ -169,5 +169,6 @@ if __name__ == "__main__":
         except:
             print("Error for %s file !!! Skipping...")
             failed_csv.write(file_name+",\n")
+        #  break
     failed_csv.close()
 
