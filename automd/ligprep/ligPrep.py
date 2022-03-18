@@ -40,10 +40,10 @@ class ligPrep:
         return self.mol_path.split(".")[-1]
 
     def _loadRWMol(self):
-        if self._getFileFormat() == "mol2" and not self.addH:
-            self._loadMolWithRW(self.mol_path)
-        else:
-            self._loadMolWithOB()
+        #  if self._getFileFormat() == "mol2" and not self.addH:
+        #      self._loadMolWithRW(self.mol_path)
+        #  else:
+        self._loadMolWithOB()
 
     def _loadMolWithRW(self, mol_path, sanitize=True):
         rd_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, sanitize=sanitize, removeHs=False)
