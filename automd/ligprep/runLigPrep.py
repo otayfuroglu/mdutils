@@ -3,6 +3,9 @@ from ase.io import read
 from ligPrep import ligPrep
 import argparse
 import os, sys, shutil
+import multiprocessing
+
+nprocs_all = int(multiprocessing.cpu_count())
 
 
 
@@ -12,7 +15,9 @@ parser.add_argument("add_hydrogen", nargs="?", default="No") # args for bool
 parser.add_argument("calculator_type", type=str)
 parser.add_argument("optimization_conf", nargs="?", default="No") # args for bool
 parser.add_argument("optimization_lig", nargs="?", default="No") # args for bool
+parser.add_argument("pre_optimization_lig", nargs="?", default="No") # args for bool
 parser.add_argument("genconformer", nargs="?", default="No") # args for bool
+parser.add_argument("nprocs", type=int, default=nprocs_all)
 parser.add_argument("thr_fmax", type=float, default=0.05)
 parser.add_argument("maxiter", type=float, default=500)
 
@@ -37,9 +42,11 @@ def getBoolStr(string):
 
 optimization_conf = getBoolStr(args.optimization_conf)
 optimization_lig = getBoolStr(args.optimization_lig)
+pre_optimization_lig = getBoolStr(args.pre_optimization_lig)
 genconformer = getBoolStr(args.genconformer)
 add_hydrogen = getBoolStr(args.add_hydrogen)
 
+nprocs = args.nprocs
 thr_fmax = args.thr_fmax
 maxiter = args.maxiter
 
@@ -53,6 +60,7 @@ def setG16calculator(lig, file_base, label, WORK_DIR):
     lig.setG16Calculator(
             label="%s/g16_%s/%s"%(WORK_DIR, label, file_base),
             chk="%s.chk"%file_base,
+            nprocs=nprocs,
             xc="HF",
             basis="6-31g*",
             scf="maxcycle=100",
@@ -91,6 +99,15 @@ def runLigPrep(file_name):
     lig = ligPrep(mol_path, addH, WORK_DIR)
     #  lig.writeRWMol2File("test/test.xyz")
 
+    #  if optimization_conf:
+    # set optimizetion parameters
+    lig.setOptParams(fmax=thr_fmax, maxiter=1000)
+
+    if pre_optimization_lig:
+        print("G16 Optimization process.. before generations")
+        lig = setG16calculator(lig, file_base, label="calculation", WORK_DIR=WORK_DIR)
+        lig.geomOptimization()
+
     if "ani2x" in calculator_type.lower():
         lig.setANI2XCalculator()
     elif "g16" in calculator_type.lower():
@@ -101,10 +118,6 @@ def runLigPrep(file_name):
             sys.exit(1)
         else:
             mmCalculator=True
-
-    #  if optimization_conf:
-    # set optimizetion parameters
-    lig.setOptParams(fmax=thr_fmax, maxiter=1000)
 
     if genconformer:
         out_file_path="%s/%sminE_conformer.sdf"%(WORK_DIR, prefix)
