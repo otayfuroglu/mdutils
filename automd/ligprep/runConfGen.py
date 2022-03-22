@@ -97,14 +97,6 @@ def runConfGen(file_name):
     lig = ligPrep(mol_path, addH, WORK_DIR)
     #  lig.writeRWMol2File("test/test.xyz")
 
-    # set optimizetion parameters
-    lig.setOptParams(fmax=thr_fmax, maxiter=1000)
-
-    if pre_optimization_lig:
-        print("G16 Optimization process.. before generations")
-        lig = setG16calculator(lig, file_base, label="calculation", WORK_DIR=WORK_DIR)
-        lig.geomOptimization()
-
     if "ani2x" in calculator_type.lower():
         lig.setANI2XCalculator()
     elif "g16" in calculator_type.lower():
@@ -115,6 +107,13 @@ def runConfGen(file_name):
             sys.exit(1)
         else:
             mmCalculator=True
+
+    # set optimizetion parameters
+    lig.setOptParams(fmax=thr_fmax, maxiter=1000)
+
+    if pre_optimization_lig:
+        print("G16 Optimization process.. before generations")
+        lig.geomOptimization()
 
     if genconformer:
         out_file_path="%s/%sminE_conformer.sdf"%(WORK_DIR, prefix)
