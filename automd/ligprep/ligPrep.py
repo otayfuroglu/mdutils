@@ -144,14 +144,18 @@ class ligPrep:
             numThreads=0,
         )
 
+        CONF_DIR = self.WORK_DIR + "/conformers"
+        if not os.path.exists(CONF_DIR):
+            os.mkdir(CONF_DIR)
+
+        # file for saving energies
+        file_csv = open("%s/confs_energies.csv" %CONF_DIR, "w")
+        print("FileName, Energy(eV)", file=file_csv)
+
         print("Number of generated conformation: %d" %len(confs))
         for i, conformerId  in enumerate(confs):
             print("%d. conformer processing..." %i)
             if saveConfs:
-                CONF_DIR = self.WORK_DIR + "/conformers"
-                if not os.path.exists(CONF_DIR):
-                    os.mkdir(CONF_DIR)
-
                 prefix = ""
                 if optimization_conf:
                     prefix = "opt_"
@@ -177,6 +181,8 @@ class ligPrep:
                     minE = e
                     #  minEGonformerID = conformerId
                     minE_ase_atoms = ase_atoms
+            print("%sconf_%d.sdf, %s"%(prefix, i, e), file=file_csv)
+        file_csv.close()
         #  print(minE, minEGonformerID)
         #  if numConfs > 1:
         #  if not optimization_conf:
