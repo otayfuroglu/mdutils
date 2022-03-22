@@ -19,6 +19,9 @@ class ligPrep:
         self.mol_path = mol_path
         self.WORK_DIR = WORK_DIR
 
+        # for activete g16 optmization algorithm
+        self.optG16 = False
+
         # set add missing H
         self.addH = addH
 
@@ -32,6 +35,7 @@ class ligPrep:
         # initialize geom opt paprameters
         self.maxiter = None
         self.fmax = None
+
 
     def _getFileFormat(self, file_path=None):
         if file_path:
@@ -76,9 +80,10 @@ class ligPrep:
         #  ase_atoms = self.obMol2AseAtoms(ob_mol)
 
         # optmization for just added H
-        self.setOptParams(fmax=0.05, maxiter=200)
-        self.setANI2XCalculator()
-        self.geomOptimization(fix_heavy_atoms=True)
+        if self.addH:
+            self.setOptParams(fmax=0.05, maxiter=200)
+            self.setANI2XCalculator()
+            self.geomOptimization(fix_heavy_atoms=True)
 
     def addHwithRD(self):
         self.rw_mol = rdkit.Chem.rdmolops.AddHs(self.rw_mol, addCoords=True)
@@ -200,12 +205,14 @@ class ligPrep:
         results["energy_abs"] = ff.CalcEnergy()
         return results
 
-    def setG16Calculator(self, label, chk, xc, basis, scf, addsec, extra):
+    def setG16Calculator(self, label, chk, nprocs, xc, basis, scf, addsec=None, extra=None):
         from ase.calculators.gaussian import Gaussian
+        self.optG16 = True
 
         self.calculator = Gaussian(
             label=label,
             chk=chk,
+            nprocshared=nprocs,
             xc=xc,
             basis=basis,
             scf=scf,
@@ -248,6 +255,7 @@ class ligPrep:
         self.fmax = fmax
 
     def _geomOptimizationConf(self, mol, conformerId):
+        from ase.calculators.gaussian import GaussianOptimizer, Gaussian
 
         if self.calculator is None:
             print("Error: Calculator not found. Please set any calculator")
@@ -262,14 +270,22 @@ class ligPrep:
             print("Error setting geometry optimizatian parameters for ASE. Please do it")
             exit(1)
 
+        if self.optG16:
+            dyn =  GaussianOptimizer(ase_atoms, self.calculator)
+            dyn.run(fmax='tight', steps=self.maxiter)
+        else:
+            ase_atoms.set_calculator(self.calculator)
+            dyn = LBFGS(ase_atoms)
+            dyn.run(fmax=self.fmax, steps=self.maxiter)
 
-        ase_atoms.set_calculator(self.calculator)
-        dyn = LBFGS(ase_atoms)
-        dyn.run(fmax=self.fmax,steps=self.maxiter)
+        #  ase_atoms.set_calculator(self.calculator)
+        #  dyn = LBFGS(ase_atoms)
+        #  dyn.run(fmax=self.fmax,steps=self.maxiter)
 
         return ase_atoms.get_potential_energy(), ase_atoms
 
     def geomOptimization(self, fix_heavy_atoms=False):
+        from ase.calculators.gaussian import GaussianOptimizer
 
         if self.calculator is None:
             print("Error: Calculator not found. Please set any calculator")
@@ -284,9 +300,13 @@ class ligPrep:
             c = FixAtoms(indices=[atom.index for atom in ase_atoms if atom.symbol != 'H'])
             ase_atoms.set_constraint(c)
 
-        ase_atoms.set_calculator(self.calculator)
-        dyn = LBFGS(ase_atoms)
-        dyn.run(fmax=self.fmax,steps=self.maxiter)
+        if self.optG16:
+            dyn =  GaussianOptimizer(ase_atoms, self.calculator)
+            dyn.run(fmax='tight', steps=self.maxiter)
+        else:
+            ase_atoms.set_calculator(self.calculator)
+            dyn = LBFGS(ase_atoms)
+            dyn.run(fmax=self.fmax, steps=self.maxiter)
 
         self.rw_mol = self.aseAtoms2rwMol(ase_atoms)
 
