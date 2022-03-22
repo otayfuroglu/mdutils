@@ -17,14 +17,15 @@ genconformer=yes
 #configuration for conformer generator parameters
 num_conformers=10
 max_attempts=5000
-prune_rms_thresh=0.5
+prune_rms_thresh=0.05
+opt_prune_rms_thresh=2.9
 
 # select caclulator type (ani2x/g16) for optimization conf
 # caculator_type=g16
 caculator_type="ani2x"
 
 # perform geometry optimization for conformers if desired (yes/no)
-optimization_conf=no
+optimization_conf=yes
 
 # perform geometry optimization for orginal ligand if desired (yes/no)
 optimization_lig=no
@@ -41,6 +42,6 @@ maxiter=500
 
 $PYTHON_DIR/python $ligPrep_DIR/runConfGen.py $struct_dir $add_hydrogen $caculator_type\
 	$optimization_conf $optimization_lig $pre_optimization_lig $genconformer\
-       	$nprocs $thr_fmax $maxiter $num_conformers $max_attempts $prune_rms_thresh
+       	$nprocs $thr_fmax $maxiter $num_conformers $max_attempts $prune_rms_thresh $opt_prune_rms_thresh
 
 
