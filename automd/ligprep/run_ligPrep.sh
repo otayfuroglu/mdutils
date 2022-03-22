@@ -1,15 +1,15 @@
 #! /usr/bin/env bash
 
-ligPrep_DIR="/cta/users/otayfuroglu/workspace/mdutils/automd/ligprep"
+ligPrep_DIR="$HOME/Desktop/mdutils/automd/ligprep"
 PYTHON_DIR="$HOME/miniconda3/bin"
 
-struct_dir=test_serdar
+struct_dir=test
 
 # adding hydrogen if missing (yes/no)
 add_hydrogen=no
 
 # optimization ligand if desired before conformer generation (yes/no)
-pre_optimization_lig=yes
+pre_optimization_lig=no
 
 # generate conformer if desired (yes/no)
 genconformer=yes
