@@ -1,4 +1,12 @@
 
+from rdkit import Chem
+from rdkit.Chem import rdMolAlign
+from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+import numpy as np
+from collections import defaultdict
+import pandas as pd
+
+
 from ase.io import read
 from ligPrep import ligPrep
 import argparse
@@ -24,10 +32,8 @@ parser.add_argument("maxiter", type=float, default=500)
 parser.add_argument("num_conformers", type=int, default=50)
 parser.add_argument("max_attempts", type=int, default=100)
 parser.add_argument("prune_rms_thresh", type=float, default=0.2)
+parser.add_argument("opt_prune_rms_thresh", type=float, default=0.2)
 
-args = parser.parse_args()
-structure_dir = args.structure_dir
-calculator_type = args.calculator_type
 
 def getBoolStr(string):
     string = string.lower()
@@ -40,22 +46,6 @@ def getBoolStr(string):
         sys.exit(1)
 
 
-optimization_conf = getBoolStr(args.optimization_conf)
-optimization_lig = getBoolStr(args.optimization_lig)
-pre_optimization_lig = getBoolStr(args.pre_optimization_lig)
-genconformer = getBoolStr(args.genconformer)
-add_hydrogen = getBoolStr(args.add_hydrogen)
-
-nprocs = args.nprocs
-thr_fmax = args.thr_fmax
-maxiter = args.maxiter
-
-
-#get conformer generator parameters
-num_conformers = args.num_conformers
-max_attempts = args.max_attempts
-prune_rms_thresh = args.prune_rms_thresh
-
 def setG16calculator(lig, file_base, label, WORK_DIR):
     lig.setG16Calculator(
             label="%s/g16_%s/%s"%(WORK_DIR, label, file_base),
@@ -66,6 +56,52 @@ def setG16calculator(lig, file_base, label, WORK_DIR):
             scf="maxcycle=100",
     )
     return lig
+
+
+def clusterConf(conf_dir, rmsd_thresh):
+    suppl_list = {Chem.SDMolSupplier(f"{conf_dir}/{file_name}"):
+                  file_name for file_name in os.listdir(conf_dir)
+                  if file_name.endswith(".sdf")}
+    mol_list = []
+    for suppl, file_name in suppl_list.items():
+        mol = next(suppl)
+        mol.SetProp("_Name", file_name)
+        mol_list.append(mol)
+
+    n_mol=len(mol_list)
+    dist_matrix=np.empty(shape=(n_mol, n_mol))
+    for i, mol1 in enumerate(mol_list):
+        for j, mol2 in enumerate(mol_list):
+            # first aling each conformer and then calculate rmsd
+            Chem.rdMolAlign.AlignMol(mol1, mol2)
+            dist_matrix[i, j] = Chem.rdMolAlign.CalcRMS(mol1, mol2)
+
+    linked = linkage(dist_matrix,'complete')
+    cluster_conf = defaultdict(list)
+    labelList = [mol.GetProp('_Name') for mol in mol_list]
+    for key, value in zip(fcluster(linked, rmsd_thresh, criterion='distance'), labelList):
+        cluster_conf[key].append(value)
+
+    return cluster_conf
+
+
+def pruneConfs(cluster_conf, confs_energies, conf_dir):
+    #  print(cluster_conf)
+    for file_names in cluster_conf.values():
+        for i, file_name in enumerate(file_names):
+            e = confs_energies.loc[confs_energies["FileName"] == file_name, " Energy(eV)"].item()
+            if i == 0:
+                minE = e
+                minE_file = file_name
+            else:
+                if minE > e:
+                    minE = e
+                    minE_file = file_name
+            file_names.remove(file_name)
+        if len (file_names) != 0:
+            for rm_file in file_names:
+                print("Removed", rm_file)
+                os.remove(f"{conf_dir}/{rm_file}")
 
 
 def runConfGen(file_name):
@@ -126,10 +162,18 @@ def runConfGen(file_name):
             optimization_conf=optimization_conf,
         )
 
+        if optimization_conf:
+            CONF_DIR = WORK_DIR + "/conformers"
+            confs_energies = pd.read_csv(f"{CONF_DIR}/confs_energies.csv")
+            cluster_conf = clusterConf(CONF_DIR, rmsd_thresh=opt_prune_rms_thresh)
+            print(cluster_conf)
+            pruneConfs(cluster_conf, confs_energies, CONF_DIR)
+
         print("Conformer generation process is done")
         if not optimization_conf and optimization_lig:
             print("Optimization for minumum energy conformer")
             lig.geomOptimization()
+
     else:
         out_file_path="%s/%s%s.sdf"%(WORK_DIR, prefix, file_base)
         # geometry optimizaton for ligand
@@ -150,6 +194,26 @@ def runConfGen(file_name):
 
 
 if __name__ == "__main__":
+    args = parser.parse_args()
+    structure_dir = args.structure_dir
+    calculator_type = args.calculator_type
+
+    optimization_conf = getBoolStr(args.optimization_conf)
+    optimization_lig = getBoolStr(args.optimization_lig)
+    pre_optimization_lig = getBoolStr(args.pre_optimization_lig)
+    genconformer = getBoolStr(args.genconformer)
+    add_hydrogen = getBoolStr(args.add_hydrogen)
+
+    nprocs = args.nprocs
+    thr_fmax = args.thr_fmax
+    maxiter = args.maxiter
+
+    #get conformer generator parameters
+    num_conformers = args.num_conformers
+    max_attempts = args.max_attempts
+    prune_rms_thresh = args.prune_rms_thresh
+    opt_prune_rms_thresh = args.opt_prune_rms_thresh
+
     file_names = [item for item in os.listdir(structure_dir) if not item.startswith(".")]
     failed_csv = open("failed_files.csv", "w")
     failed_csv.write("FileNames,\n")
