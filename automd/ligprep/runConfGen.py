@@ -166,7 +166,6 @@ def runConfGen(file_name):
             CONF_DIR = WORK_DIR + "/conformers"
             confs_energies = pd.read_csv(f"{CONF_DIR}/confs_energies.csv")
             cluster_conf = clusterConf(CONF_DIR, rmsd_thresh=opt_prune_rms_thresh)
-            print(cluster_conf)
             pruneConfs(cluster_conf, confs_energies, CONF_DIR)
 
         print("Conformer generation process is done")
