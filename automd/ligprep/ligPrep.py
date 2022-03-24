@@ -287,7 +287,7 @@ class ligPrep:
         self.opt_method = opt_method.lower()
 
     def _getOptMethod(self, ase_atoms):
-        if self.opt_method is None or self.opt_method=="lfbgs":
+        if self.opt_method is None or self.opt_method=="lbfgs":
             from ase.optimize import LBFGS
             return LBFGS(ase_atoms)
         elif self.opt_method=="bfgs":
