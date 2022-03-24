@@ -20,7 +20,7 @@ genconformer=yes
 #configuration for conformer generator parameters
 num_conformers=0
 max_attempts=5000
-prune_rms_thresh=0.05
+prune_rms_thresh=0.5
 opt_prune_rms_thresh=1.5
 
 # select caclulator type (ani2x/g16) for optimization conf
@@ -28,7 +28,7 @@ opt_prune_rms_thresh=1.5
 caculator_type="ani2x"
 
 # perform geometry optimization for conformers if desired (yes/no)
-optimization_conf=yes
+optimization_conf=no
 
 # perform geometry optimization for orginal ligand if desired (yes/no)
 optimization_lig=no
