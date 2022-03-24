@@ -119,8 +119,25 @@ class ligPrep:
             w.flush()
             w.close()
 
+    def _getTorsionPoints(self):
+        from rdkit.Chem import TorsionFingerprints
+        torsion_points = []
+        for torsions_list in TorsionFingerprints.CalculateTorsionLists(self.rw_mol):
+            for torsions in torsions_list:
+                if 180 in torsions:
+                    torsion_points.append(torsions[0][0])
+        return(torsion_points)
+
+    def _getNunConfs(self):
+        n_torsions = len(self._getTorsionPoints())
+        if n_torsions > 10:
+            return 10
+        else:
+            return 2 ** n_torsions
+
+
     def genMinEGonformer(self, file_path,
-                         numConfs=20,
+                         numConfs=0,
                          maxAttempts=1000,
                          pruneRmsThresh=0.1,
                          mmCalculator=False,
@@ -134,6 +151,10 @@ class ligPrep:
 
         #  self.addHwithRD()
         mol = copy.deepcopy(self.rw_mol)
+        if numConfs is 0:
+            numConfs = self._getNunConfs()
+            print(f"Maximum number of conformers settint to {numConfs}")
+
 
         confs = rdkit.Chem.AllChem.EmbedMultipleConfs(
             mol,
