@@ -324,7 +324,6 @@ class ligPrep:
             dyn.run(fmax='tight', steps=self.maxiter)
         else:
             ase_atoms.set_calculator(self.calculator)
-            print(self._getOptMethod(ase_atoms) )
             dyn = self._getOptMethod(ase_atoms)
             dyn.run(fmax=self.fmax, steps=self.maxiter)
 
