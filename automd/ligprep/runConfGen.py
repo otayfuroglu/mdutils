@@ -21,6 +21,7 @@ parser = argparse.ArgumentParser(description="Give something ...")
 parser.add_argument("structure_dir", type=str)
 parser.add_argument("add_hydrogen", nargs="?", default="No") # args for bool
 parser.add_argument("calculator_type", type=str)
+parser.add_argument("optimization_method", nargs="?", default="No") # args for bool
 parser.add_argument("optimization_conf", nargs="?", default="No") # args for bool
 parser.add_argument("optimization_lig", nargs="?", default="No") # args for bool
 parser.add_argument("pre_optimization_lig", nargs="?", default="No") # args for bool
@@ -86,10 +87,9 @@ def clusterConf(conf_dir, rmsd_thresh):
 
 
 def pruneConfs(cluster_conf, confs_energies, conf_dir):
-    #  print(cluster_conf)
     for file_names in cluster_conf.values():
         for i, file_name in enumerate(file_names):
-            e = confs_energies.loc[confs_energies["FileName"] == file_name, " Energy(eV)"].item()
+            e = float(confs_energies.loc[confs_energies["FileName"] == file_name, " Energy(eV)"].item())
             if i == 0:
                 minE = e
                 minE_file = file_name
@@ -97,7 +97,7 @@ def pruneConfs(cluster_conf, confs_energies, conf_dir):
                 if minE > e:
                     minE = e
                     minE_file = file_name
-            file_names.remove(file_name)
+        file_names.remove(minE_file)
         if len (file_names) != 0:
             for rm_file in file_names:
                 print("Removed", rm_file)
@@ -131,6 +131,7 @@ def runConfGen(file_name):
 
     # initialize confGen
     lig = ligPrep(mol_path, addH, WORK_DIR)
+    lig.setOptMethod(optimization_method)
     #  lig.writeRWMol2File("test/test.xyz")
 
     if "ani2x" in calculator_type.lower():
@@ -196,6 +197,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     structure_dir = args.structure_dir
     calculator_type = args.calculator_type
+
+    optimization_method = args.optimization_method
+    print(optimization_method)
 
     optimization_conf = getBoolStr(args.optimization_conf)
     optimization_lig = getBoolStr(args.optimization_lig)
