@@ -60,13 +60,13 @@ def setG16calculator(lig, file_base, label, WORK_DIR):
 
 
 def clusterConf(conf_dir, rmsd_thresh):
-    suppl_list = {Chem.SDMolSupplier(f"{conf_dir}/{file_name}"):
-                  file_name for file_name in os.listdir(conf_dir)
-                  if file_name.endswith(".sdf")}
+    suppl_list = {Chem.SDMolSupplier(f"{conf_dir}/{fl_name}"):
+                  fl_name for fl_name in os.listdir(conf_dir)
+                  if fl_name.endswith(".sdf")}
     mol_list = []
-    for suppl, file_name in suppl_list.items():
+    for suppl, fl_name in suppl_list.items():
         mol = next(suppl)
-        mol.SetProp("_Name", file_name)
+        mol.SetProp("_Name", fl_name)
         mol_list.append(mol)
 
     n_mol=len(mol_list)
@@ -83,26 +83,39 @@ def clusterConf(conf_dir, rmsd_thresh):
     linked = linkage(dist_matrix,'complete')
     cluster_conf = defaultdict(list)
     labelList = [mol.GetProp('_Name') for mol in mol_list]
-    for key, value in zip(fcluster(linked, rmsd_thresh, criterion='distance'), labelList):
-        cluster_conf[key].append(value)
+    for key, fl_name in zip(fcluster(linked, rmsd_thresh, criterion='distance'), labelList):
+        cluster_conf[key].append(fl_name)
+
+        # save clusturedd files seperately
+        directory = f"{conf_dir}/cluster_{key}"
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+        file_path = f"{directory}/{fl_name}"
+        for mol in mol_list:
+            if mol.GetProp('_Name') == fl_name:
+                mol = mol
+                break
+        with Chem.rdmolfiles.SDWriter(file_path) as writer:
+            writer.write(mol)
 
     return cluster_conf
 
 
 def pruneConfs(cluster_conf, confs_energies, conf_dir):
-    for file_names in cluster_conf.values():
-        for i, file_name in enumerate(file_names):
-            e = float(confs_energies.loc[confs_energies["FileName"] == file_name, " Energy(eV)"].item())
+    for fl_names in cluster_conf.values():
+        for i, fl_name in enumerate(fl_names):
+            e = float(confs_energies.loc[confs_energies["FileName"] == fl_name, " Energy(eV)"].item())
             if i == 0:
                 minE = e
-                minE_file = file_name
+                minE_file = fl_name
             else:
                 if minE > e:
                     minE = e
-                    minE_file = file_name
-        file_names.remove(minE_file)
-        if len (file_names) != 0:
-            for rm_file in file_names:
+                    minE_file = fl_name
+        fl_names.remove(minE_file)
+        os.rename(f"{conf_dir}/{minE_file}", f"{conf_dir}/pruned_{minE_file}")
+        if len (fl_names) != 0:
+            for rm_file in fl_names:
                 print("Removed", rm_file)
                 os.remove(f"{conf_dir}/{rm_file}")
 
