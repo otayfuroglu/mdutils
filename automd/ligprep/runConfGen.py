@@ -70,6 +70,9 @@ def clusterConf(conf_dir, rmsd_thresh):
         mol_list.append(mol)
 
     n_mol=len(mol_list)
+    if n_mol <= 1:
+        print("Clustering do not applied.. There is just one conformer")
+        return 0
     dist_matrix=np.empty(shape=(n_mol, n_mol))
     for i, mol1 in enumerate(mol_list):
         for j, mol2 in enumerate(mol_list):
@@ -167,7 +170,8 @@ def runConfGen(file_name):
             CONF_DIR = WORK_DIR + "/conformers"
             confs_energies = pd.read_csv(f"{CONF_DIR}/confs_energies.csv")
             cluster_conf = clusterConf(CONF_DIR, rmsd_thresh=opt_prune_rms_thresh)
-            pruneConfs(cluster_conf, confs_energies, CONF_DIR)
+            if cluster_conf != 0:
+                pruneConfs(cluster_conf, confs_energies, CONF_DIR)
 
         print("Conformer generation process is done")
         if not optimization_conf and optimization_lig:
@@ -199,7 +203,6 @@ if __name__ == "__main__":
     calculator_type = args.calculator_type
 
     optimization_method = args.optimization_method
-    print(optimization_method)
 
     optimization_conf = getBoolStr(args.optimization_conf)
     optimization_lig = getBoolStr(args.optimization_lig)
