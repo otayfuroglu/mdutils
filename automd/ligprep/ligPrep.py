@@ -153,7 +153,7 @@ class ligPrep:
         mol = copy.deepcopy(self.rw_mol)
         if numConfs is 0:
             numConfs = self._getNunConfs()
-            print(f"Maximum number of conformers settint to {numConfs}")
+            print(f"Maximum number of conformers setting to {numConfs}")
 
 
         confs = rdkit.Chem.AllChem.EmbedMultipleConfs(
