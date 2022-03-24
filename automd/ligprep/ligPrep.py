@@ -2,7 +2,6 @@
 from openbabel import openbabel
 from ase import Atoms
 from ase.io import write
-from ase.optimize import LBFGS
 
 import rdkit
 from  rdkit import Chem
@@ -35,6 +34,9 @@ class ligPrep:
         # initialize geom opt paprameters
         self.maxiter = None
         self.fmax = None
+
+        # initialize optimization method
+        self.opt_method = None
 
 
     def _getFileFormat(self, file_path=None):
@@ -260,6 +262,26 @@ class ligPrep:
         self.maxiter = maxiter
         self.fmax = fmax
 
+    def setOptMethod(self, opt_method):
+        self.opt_method = opt_method.lower()
+
+    def _getOptMethod(self, ase_atoms):
+        if self.opt_method is None or self.opt_method=="lfbgs":
+            from ase.optimize import LBFGS
+            return LBFGS(ase_atoms)
+        elif self.opt_method=="bfgs":
+            from ase.optimize import BFGS
+            return BFGS(ase_atoms)
+        elif self.opt_method=="fire":
+            from ase.optimize import FIRE
+            return FIRE(ase_atoms)
+        elif self.opt_method=="gpmin":
+            from ase.optimize import GPMin
+            return GPMin(ase_atoms)
+        elif self.opt_method=="berny":
+            from ase.optimize import Berny
+            return Berny(ase_atoms)
+
     def _geomOptimizationConf(self, mol, conformerId):
         from ase.calculators.gaussian import GaussianOptimizer, Gaussian
 
@@ -281,7 +303,8 @@ class ligPrep:
             dyn.run(fmax='tight', steps=self.maxiter)
         else:
             ase_atoms.set_calculator(self.calculator)
-            dyn = LBFGS(ase_atoms)
+            print(self._getOptMethod(ase_atoms) )
+            dyn = self._getOptMethod(ase_atoms)
             dyn.run(fmax=self.fmax, steps=self.maxiter)
 
         #  ase_atoms.set_calculator(self.calculator)
@@ -311,7 +334,8 @@ class ligPrep:
             dyn.run(fmax='tight', steps=self.maxiter)
         else:
             ase_atoms.set_calculator(self.calculator)
-            dyn = LBFGS(ase_atoms)
+            #  self.dyn = LBFGS(ase_atoms)
+            dyn = self._getOptMethod(ase_atoms)
             dyn.run(fmax=self.fmax, steps=self.maxiter)
 
         self.rw_mol = self.aseAtoms2rwMol(ase_atoms)
