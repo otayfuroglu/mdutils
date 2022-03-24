@@ -8,6 +8,9 @@ struct_dir=test
 # adding hydrogen if missing (yes/no)
 add_hydrogen=no
 
+# set optizetions methods whichs availble in ASE (BFGS, LBFGS, GPMin, FIRE, Berny)
+optimization_method=FIRE
+
 # optimization ligand if desired before conformer generation (yes/no)
 pre_optimization_lig=no
 
@@ -18,7 +21,7 @@ genconformer=yes
 num_conformers=10
 max_attempts=5000
 prune_rms_thresh=0.05
-opt_prune_rms_thresh=2.9
+opt_prune_rms_thresh=1.5
 
 # select caclulator type (ani2x/g16) for optimization conf
 # caculator_type=g16
@@ -41,7 +44,7 @@ maxiter=500
 
 
 $PYTHON_DIR/python $ligPrep_DIR/runConfGen.py $struct_dir $add_hydrogen $caculator_type\
-	$optimization_conf $optimization_lig $pre_optimization_lig $genconformer\
+	$optimization_method $optimization_conf $optimization_lig $pre_optimization_lig $genconformer\
        	$nprocs $thr_fmax $maxiter $num_conformers $max_attempts $prune_rms_thresh $opt_prune_rms_thresh
 
 
