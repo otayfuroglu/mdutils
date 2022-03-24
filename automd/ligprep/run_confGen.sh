@@ -9,7 +9,7 @@ struct_dir=test
 add_hydrogen=no
 
 # set optizetions methods whichs availble in ASE (BFGS, LBFGS, GPMin, FIRE, Berny)
-optimization_method=FIRE
+optimization_method=LFBGS
 
 # optimization ligand if desired before conformer generation (yes/no)
 pre_optimization_lig=no
@@ -18,7 +18,7 @@ pre_optimization_lig=no
 genconformer=yes
 
 #configuration for conformer generator parameters
-num_conformers=0
+num_conformers=10
 max_attempts=5000
 prune_rms_thresh=0.5
 opt_prune_rms_thresh=1.5
@@ -28,7 +28,7 @@ opt_prune_rms_thresh=1.5
 caculator_type="ani2x"
 
 # perform geometry optimization for conformers if desired (yes/no)
-optimization_conf=no
+optimization_conf=yes
 
 # perform geometry optimization for orginal ligand if desired (yes/no)
 optimization_lig=no
