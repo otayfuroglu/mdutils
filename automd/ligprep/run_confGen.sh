@@ -18,7 +18,7 @@ pre_optimization_lig=no
 genconformer=yes
 
 #configuration for conformer generator parameters
-num_conformers=10
+num_conformers=0
 max_attempts=5000
 prune_rms_thresh=0.05
 opt_prune_rms_thresh=1.5
