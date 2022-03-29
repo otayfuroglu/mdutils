@@ -7,7 +7,10 @@ import rdkit
 from  rdkit import Chem
 from  rdkit.Chem import AllChem
 #  import os_util
+from collections import defaultdict
 import sys, os
+import numpy as np
+import pandas as pd
 
 class ligPrep:
     """
@@ -37,7 +40,6 @@ class ligPrep:
 
         # initialize optimization method
         self.opt_method = None
-
 
     def _getFileFormat(self, file_path=None):
         if file_path:
@@ -83,6 +85,7 @@ class ligPrep:
 
         # optmization for just added H
         if self.addH:
+            self.setOptMethod(opt_method="LBFGS")
             self.setOptParams(fmax=0.05, maxiter=200)
             self.setANI2XCalculator()
             self.geomOptimization(fix_heavy_atoms=True)
@@ -128,20 +131,127 @@ class ligPrep:
                     torsion_points.append(torsions[0][0])
         return(torsion_points)
 
-    def _getNunConfs(self):
+    def _getNumConfs(self, scaled=1):
         n_torsions = len(self._getTorsionPoints())
         if n_torsions > 10:
-            return 10
+            return 5000
         else:
-            return 2 ** n_torsions
+            return int(scaled * 2 ** n_torsions)
 
+    def _getConfDistMatrix(self, mol, conformerIds):
+
+        #  conf_list = []
+        #  for conformerId in conformerIds:
+        #      print(conformerId)
+        #      conf = mol.GetConformer(conformerId)
+        #      #  positions = conf.GetPositions()
+        #      #  print(positions)
+        #      conf.SetProp("_Name", str(conformerId))
+        #      conf_list.append(conf)
+
+        #  print(conf_list)
+        n_mol=len(conformerIds)
+        if n_mol <= 1:
+            print("Clustering do not applied.. There is just one conformer")
+            return 0
+        conf_dist_matrix = np.empty(shape=(n_mol, n_mol))
+        for conf1_id in conformerIds:
+            for conf2_id in conformerIds:
+                conf_dist_matrix[conf1_id, conf2_id] = AllChem.GetConformerRMS(mol, conf1_id, conf2_id, prealigned=False)
+
+        return conf_dist_matrix
+
+    def _getClusterKmeansFromConfIds(self, conformerIds, dist_matrix, n_group):
+        from scipy.cluster.vq import kmeans, vq, whiten
+
+        cluster_conf_id = defaultdict(list)
+        whitened = whiten(dist_matrix)
+        centroids, _ = kmeans(whitened, n_group)
+        cluster, _ = vq(whitened,centroids)
+        for key, value in zip(cluster, conformerIds):
+            cluster_conf_id[key].append(value)
+
+        return cluster_conf_id
+
+    def _getClusterRMSDFromFiles(self, conf_dir, rmsd_thresh):
+        from scipy.cluster.hierarchy import linkage, fcluster
+        suppl_list = {Chem.SDMolSupplier(f"{conf_dir}/{fl_name}"):
+                      fl_name for fl_name in os.listdir(conf_dir)
+                      if fl_name.endswith(".sdf")}
+        mol_list = []
+        for suppl, fl_name in suppl_list.items():
+            mol = next(suppl)
+            mol.SetProp("_Name", fl_name)
+            mol_list.append(mol)
+
+        n_mol=len(mol_list)
+        if n_mol <= 1:
+            print("Clustering do not applied.. There is just one conformer")
+            return 0
+        dist_matrix=np.empty(shape=(n_mol, n_mol))
+        for i, mol1 in enumerate(mol_list):
+            for j, mol2 in enumerate(mol_list):
+                # first aling each conformer and then calculate rmsd
+                #  Chem.rdMolAlign.AlignMol(mol1, mol2)
+                dist_matrix[i, j] = Chem.rdMolAlign.GetBestRMS(mol1, mol2)
+        linked = linkage(dist_matrix,'complete')
+        cluster_conf = defaultdict(list)
+        labelList = [mol.GetProp('_Name') for mol in mol_list]
+        for key, fl_name in zip(fcluster(linked, rmsd_thresh, criterion='distance'), labelList):
+            cluster_conf[key].append(fl_name)
+
+            # save clusturedd files seperately
+            directory = f"{conf_dir}/cluster_{key}"
+            if not os.path.exists(directory):
+                os.mkdir(directory)
+            file_path = f"{directory}/{fl_name}"
+            for mol in mol_list:
+                if mol.GetProp('_Name') == fl_name:
+                    mol = mol
+                    break
+            with Chem.rdmolfiles.SDWriter(file_path) as writer:
+                writer.write(mol)
+
+        return cluster_conf
+
+    def _pruneOptConfs(self, cluster_conf, confs_energies, conf_dir):
+        i = 0
+        for fl_names in cluster_conf.values():
+            for j, fl_name in enumerate(fl_names):
+                e = float(confs_energies.loc[confs_energies["FileName"] == fl_name, " Energy(eV)"].item())
+                if i == 0:
+                    global_minE = e
+                    global_minE_file = fl_name
+                else:
+                    if global_minE > e:
+                        global_minE = e
+                        global_minE_file = fl_name
+                i += 1
+
+                if j == 0:
+                    minE = e
+                    minE_file = fl_name
+                else:
+                    if minE > e:
+                        minE = e
+                        minE_file = fl_name
+            fl_names.remove(minE_file)
+            os.rename(f"{conf_dir}/{minE_file}", f"{conf_dir}/pruned_{minE_file}")
+            if len (fl_names) != 0:
+                for rm_file in fl_names:
+                    print("Removed", rm_file)
+                    os.remove(f"{conf_dir}/{rm_file}")
+
+        # file which has global minimum enery renamed 
+        os.rename(f"{conf_dir}/pruned_{global_minE_file}", f"{conf_dir}/global_minE_{global_minE_file}")
 
     def genMinEGonformer(self, file_path,
-                         numConfs=0,
-                         maxAttempts=1000,
+                         numConfs=100,
+                         maxAttempts=10000,
                          pruneRmsThresh=0.1,
                          mmCalculator=False,
                          optimization_conf=False,
+                         opt_prune_rms_thresh=1.0,
                          saveConfs=True,
                          useExpTorsionAnglePrefs=True,
                          useBasicKnowledge=True,
@@ -151,10 +261,9 @@ class ligPrep:
 
         #  self.addHwithRD()
         mol = copy.deepcopy(self.rw_mol)
-        if numConfs is 0:
-            numConfs = self._getNunConfs()
+        if numConfs is 0 or numConfs < self._getNumConfs(scaled=10):
+            numConfs = self._getNumConfs(scaled=10)
             print(f"Maximum number of conformers setting to {numConfs}")
-
 
         confs = rdkit.Chem.AllChem.EmbedMultipleConfs(
             mol,
@@ -167,27 +276,34 @@ class ligPrep:
             numThreads=0,
         )
 
-        CONF_DIR = self.WORK_DIR + "/conformers"
-        if not os.path.exists(CONF_DIR):
-            os.mkdir(CONF_DIR)
-
         # file for saving energies
-        file_csv = open("%s/confs_energies.csv" %CONF_DIR, "w")
+        file_csv = open("%s/all_confs_sp_energies.csv" %self.WORK_DIR, "w")
         print("FileName, Energy(eV)", file=file_csv)
 
         print("Number of generated conformation: %d" %len(confs))
-        for i, conformerId  in enumerate(confs):
-            print("%d. conformer processing..." %i)
-            if saveConfs:
-                prefix = ""
-                if optimization_conf:
-                    prefix = "opt_"
-                conf_file_path = "%s/%sconf_%d.sdf"%(CONF_DIR, prefix, i)
-                self._writeConf2File(mol, conformerId, conf_file_path)
 
-            if optimization_conf:
-                e, ase_atoms = self._geomOptimizationConf(mol, conformerId)
-            else:
+        dist_matrix = self._getConfDistMatrix(mol, confs)
+
+        cluster_conf_id = self._getClusterKmeansFromConfIds(confs, dist_matrix,
+                                           n_group=self._getNumConfs(scaled=1)
+                                          )
+
+        #  for k-means clutering
+        minEConformerIDs = []
+        for cluster, clustered_confIds in cluster_conf_id.items():
+
+            if saveConfs:
+                CONF_DIR = self.WORK_DIR + f"/confs_cluster_{cluster}"
+                if not os.path.exists(CONF_DIR):
+                    os.mkdir(CONF_DIR)
+
+            for i, conformerId  in enumerate(clustered_confIds):
+                #  print("%d. conformer processing..." %i)
+                if saveConfs:
+                    prefix = ""
+                    conf_file_path = "%s/conf_%d.sdf"%(CONF_DIR, conformerId)
+                    self._writeConf2File(mol, conformerId, conf_file_path)
+
                 #create ase atoms
                 ase_atoms = self._rwConformer2AseAtoms(mol, conformerId)
                 if mmCalculator:
@@ -195,31 +311,79 @@ class ligPrep:
                 else:
                     e = self._calcSPEnergy(mol, conformerId)
 
-            if i == 0:
-                minE = e
-                #  minEGonformerID = conformerId
-                minE_ase_atoms = ase_atoms
-            else:
-                if minE > e:
+                if i == 0:
                     minE = e
-                    #  minEGonformerID = conformerId
+                    minEConformerID = conformerId
                     minE_ase_atoms = ase_atoms
-            print("%sconf_%d.sdf, %s"%(prefix, i, e), file=file_csv)
-        file_csv.close()
-        #  print(minE, minEGonformerID)
-        #  if numConfs > 1:
-        #  if not optimization_conf:
-        #      _, ase_atoms = self._geomOptimizationConf(mol, minEGonformerID)
-        #  else:
-        #      ase_atoms = self._rwConformer2AseAtoms(mol, minEGonformerID)
+                else:
+                    if minE > e:
+                        minE = e
+                        minEConformerID = conformerId
+                        minE_ase_atoms = ase_atoms
+                print("%sconf_%d.sdf, %s"%(prefix, conformerId, e), file=file_csv)
 
-        # compeare initial struct and minE conf. energies
-        if self.calcSPEnergy() >  minE:
-            # assign minE conformer to self rw mol
-            self.rw_mol = self.aseAtoms2rwMol(minE_ase_atoms)
-            print("Selected minimun energy conformer")
-        else:
-            print("!!! INITIAL structure as is minimun energy conformer !!!")
+            minEConformerIDs.append(minEConformerID)
+
+            #  print(minE, minEGonformerID)
+            #  if numConfs > 1:
+            #  if not optimization_conf:
+            #      _, ase_atoms = self._geomOptimizationConf(mol, minEGonformerID)
+            #  else:
+            #      ase_atoms = self._rwConformer2AseAtoms(mol, minEGonformerID)
+
+            # compeare initial struct and minE conf. energies
+            #  if self.calcSPEnergy() >  minE:
+            #      # assign minE conformer to self rw mol
+            #      self.rw_mol = self.aseAtoms2rwMol(minE_ase_atoms)
+            #      print("Selected minimun energy conformer")
+            #  else:
+            #      print("!!! INITIAL structure as is minimun energy conformer !!!")
+
+        # test
+        assert len(minEConformerIDs) == len(cluster_conf_id.keys())
+        # close to csv file
+        file_csv.close()
+
+        MIN_E_CONF_DIR = self.WORK_DIR + "/opt_minE_confs"
+        if not os.path.exists(MIN_E_CONF_DIR):
+            os.mkdir(MIN_E_CONF_DIR)
+
+        if optimization_conf:
+            opt_file_csv = open("%s/opt_confs_energies.csv" %MIN_E_CONF_DIR, "w")
+            print("FileName, Energy(eV)", file=opt_file_csv)
+
+            for i, conformerId  in enumerate(minEConformerIDs):
+                e, ase_atoms = self._geomOptimizationConf(mol, conformerId)
+                prefix = "opt_"
+                conf_file_path = "%s/%sconf_%d.sdf"%(MIN_E_CONF_DIR, prefix, conformerId)
+                self._writeConf2File(mol, conformerId, conf_file_path)
+                print("%sconf_%d.sdf, %s"%(prefix, conformerId, e), file=opt_file_csv)
+            opt_file_csv.close()
+
+            # cluster and prune opitimzed confs by RMSD
+            confs_energies = pd.read_csv(f"{MIN_E_CONF_DIR}/opt_confs_energies.csv")
+            print(confs_energies)
+            cluster_conf = self._getClusterRMSDFromFiles(MIN_E_CONF_DIR, rmsd_thresh=opt_prune_rms_thresh)
+            if cluster_conf != 0:
+                self._pruneOptConfs(cluster_conf, confs_energies, MIN_E_CONF_DIR)
+
+                #  #create ase atoms
+                #  ase_atoms = self._rwConformer2AseAtoms(mol, conformerId)
+                #  if mmCalculator:
+                #      e = self._calcEnergyWithMM(mol, conformerId, 100)["energy_abs"]
+                #  else:
+                #      e = self._calcSPEnergy(mol, conformerId)
+
+                #  if i == 0:
+                #      minE = e
+                #      minEConformerID = conformerId
+                #      minE_ase_atoms = ase_atoms
+                #  else:
+                #      if minE > e:
+                #          minE = e
+                #          minEConformerID = conformerId
+                #          minE_ase_atoms = ase_atoms
+
 
     def _calcEnergyWithMM(self, mol, conformerId, minimizeIts):
         ff = rdkit.Chem.AllChem.MMFFGetMoleculeForceField(
@@ -402,7 +566,6 @@ class ligPrep:
         self._rmFileExist("tmp.pdb")
 
         return AllChem.AssignBondOrdersFromTemplate(self.rw_mol, rd_mol)
-
 
     def writeAseAtoms(self, file_path):
         ase_atoms = self.rwMol2AseAtoms()
