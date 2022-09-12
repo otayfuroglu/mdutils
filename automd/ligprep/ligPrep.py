@@ -247,6 +247,7 @@ class ligPrep:
 
     def genMinEGonformer(self, file_path,
                          numConfs=100,
+                         ETKDG=False,
                          maxAttempts=10000,
                          pruneRmsThresh=0.1,
                          mmCalculator=False,
@@ -255,7 +256,8 @@ class ligPrep:
                          saveConfs=True,
                          useExpTorsionAnglePrefs=True,
                          useBasicKnowledge=True,
-                         enforceChirality=True):
+                         enforceChirality=True
+                        ):
 
         import copy
 
@@ -265,16 +267,20 @@ class ligPrep:
             numConfs = self._getNumConfs(scaled=10)
             print(f"Maximum number of conformers setting to {numConfs}")
 
-        confs = rdkit.Chem.AllChem.EmbedMultipleConfs(
-            mol,
-            numConfs=numConfs,
-            maxAttempts=maxAttempts,
-            pruneRmsThresh=pruneRmsThresh,
-            useExpTorsionAnglePrefs=useExpTorsionAnglePrefs,
-            useBasicKnowledge=useBasicKnowledge,
-            enforceChirality=enforceChirality,
-            numThreads=0,
-        )
+        if ETKDG:
+            confs = rdkit.Chem.AllChem.EmbedMultipleConfs(
+                mol, numConfs=numConfs)
+        else:
+            confs = rdkit.Chem.AllChem.EmbedMultipleConfs(
+                mol,
+                numConfs=numConfs,
+                maxAttempts=maxAttempts,
+                pruneRmsThresh=pruneRmsThresh,
+                useExpTorsionAnglePrefs=useExpTorsionAnglePrefs,
+                useBasicKnowledge=useBasicKnowledge,
+                enforceChirality=enforceChirality,
+                numThreads=0,
+            )
 
         # file for saving energies
         file_csv = open("%s/all_confs_sp_energies.csv" %self.WORK_DIR, "w")
@@ -355,8 +361,15 @@ class ligPrep:
             for i, conformerId  in enumerate(minEConformerIDs):
                 e, ase_atoms = self._geomOptimizationConf(mol, conformerId)
                 prefix = "opt_"
-                conf_file_path = "%s/%sconf_%d.sdf"%(MIN_E_CONF_DIR, prefix, conformerId)
-                self._writeConf2File(mol, conformerId, conf_file_path)
+                conf_file_path = "%s/%sconf_%d.xyz"%(MIN_E_CONF_DIR, prefix, conformerId)
+
+                # save optimized structure  with ase
+                write(conf_file_path, ase_atoms)
+
+                # save optimized structure  with rdkit as sdf
+                #  with Chem.rdmolfiles.SDWriter(conf_file_path) as writer:
+                #      writer.write(self.aseAtoms2rwMol(ase_atoms))
+
                 print("%sconf_%d.sdf, %s"%(prefix, conformerId, e), file=opt_file_csv)
             opt_file_csv.close()
 
