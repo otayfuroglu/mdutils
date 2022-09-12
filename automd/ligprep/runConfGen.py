@@ -99,7 +99,7 @@ def runConfGen(file_name):
             mmCalculator=True
 
     # set optimizetion parameters
-    lig.setOptParams(fmax=thr_fmax, maxiter=1000)
+    lig.setOptParams(fmax=thr_fmax, maxiter=args.maxiter)
 
     if pre_optimization_lig:
         print("G16 Optimization process.. before generations")
