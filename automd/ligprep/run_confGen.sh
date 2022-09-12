@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-ligPrep_DIR="$HOME/Desktop/mdutils/automd/ligprep"
+ligPrep_DIR="$HOME//workspace/mdutils/automd/ligprep"
 PYTHON_DIR="$HOME/miniconda3/bin"
 
 struct_dir=test
@@ -9,7 +9,7 @@ struct_dir=test
 add_hydrogen=no
 
 # set optizetions methods whichs availble in ASE (BFGS, LBFGS, GPMin, FIRE, Berny)
-optimization_method=fire
+optimization_method=LBFGS
 
 # optimization ligand if desired before conformer generation (yes/no)
 pre_optimization_lig=no
@@ -18,10 +18,11 @@ pre_optimization_lig=no
 genconformer=yes
 
 #configuration for conformer generator parameters
-num_conformers=4
-max_attempts=5000
+ETKDG=yes
+num_conformers=500
+max_attempts=10000
 prune_rms_thresh=0.05
-opt_prune_rms_thresh=1.5
+opt_prune_rms_thresh=0.2
 
 # select caclulator type (ani2x/g16) for optimization conf
 # caculator_type=g16
@@ -45,6 +46,6 @@ maxiter=500
 
 $PYTHON_DIR/python $ligPrep_DIR/runConfGen.py $struct_dir $add_hydrogen $caculator_type\
 	$optimization_method $optimization_conf $optimization_lig $pre_optimization_lig $genconformer\
-       	$nprocs $thr_fmax $maxiter $num_conformers $max_attempts $prune_rms_thresh $opt_prune_rms_thresh
+       	$nprocs $thr_fmax $maxiter $ETKDG $num_conformers $max_attempts $prune_rms_thresh $opt_prune_rms_thresh
 
 
