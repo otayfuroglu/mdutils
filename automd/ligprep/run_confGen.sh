@@ -18,7 +18,7 @@ pre_optimization_lig=no
 genconformer=yes
 
 #configuration for conformer generator parameters
-ETKDG=yes
+ETKDG=no
 num_conformers=500
 max_attempts=10000
 prune_rms_thresh=0.05
