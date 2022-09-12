@@ -26,6 +26,7 @@ parser.add_argument("nprocs", type=int, default=nprocs_all)
 parser.add_argument("thr_fmax", type=float, default=0.05)
 parser.add_argument("maxiter", type=float, default=500)
 
+parser.add_argument("ETKDG", nargs="?", default="No") # args for bool
 parser.add_argument("num_conformers", type=int, default=50)
 parser.add_argument("max_attempts", type=int, default=100)
 parser.add_argument("prune_rms_thresh", type=float, default=0.2)
@@ -108,6 +109,7 @@ def runConfGen(file_name):
         lig.genMinEGonformer(
             file_path=out_file_path,
             numConfs=num_conformers,
+            ETKDG=ETKDG,
             maxAttempts=max_attempts,
             pruneRmsThresh=prune_rms_thresh,
             mmCalculator=mmCalculator,
@@ -151,6 +153,7 @@ if __name__ == "__main__":
     pre_optimization_lig = getBoolStr(args.pre_optimization_lig)
     genconformer = getBoolStr(args.genconformer)
     add_hydrogen = getBoolStr(args.add_hydrogen)
+    ETKDG = getBoolStr(args.ETKDG)
 
     nprocs = args.nprocs
     thr_fmax = args.thr_fmax
@@ -173,6 +176,6 @@ if __name__ == "__main__":
         #  except:
         #      print("Error for %s file !!! Skipping...")
         #      failed_csv.write(file_name+",\n")
-        break
+        #  break
     failed_csv.close()
 
