@@ -8,6 +8,7 @@ from ligPrep import ligPrep
 import argparse
 import os, sys, shutil
 import multiprocessing
+import time
 
 nprocs_all = int(multiprocessing.cpu_count())
 
@@ -169,13 +170,19 @@ if __name__ == "__main__":
     failed_csv = open("failed_files.csv", "w")
     failed_csv.write("FileNames,\n")
 
+    fl_timing = open("timings.csv", "w")
+    print("FileName,Time(min.)", file=fl_timing)
     for file_name in file_names:
         file_base = file_name.split(".")[0]
         #  try:
+        s_time = time.time()
         runConfGen(file_name)
+
+        print(file_name, ",", "%.4f"%((time.time()-s_time)/60), file=fl_timing)
         #  except:
         #      print("Error for %s file !!! Skipping...")
         #      failed_csv.write(file_name+",\n")
         #  break
+    fl_timing.close()
     failed_csv.close()
 
