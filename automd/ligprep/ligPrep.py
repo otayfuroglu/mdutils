@@ -76,7 +76,17 @@ class ligPrep:
         obConversion.WriteFile(ob_mol, tmp_file_name)
 
         # laod as RW file
-        self._loadMolWithRW(tmp_file_name)
+        try:
+            self._loadMolWithRW(tmp_file_name)
+        except:
+            self._loadMolWithRW(tmp_file_name, sanitize=False)
+
+            # correction  kekuleize error (especially N in aromatic ring)
+            print("\nWarning!: There is kekulize error, ingnored sanitize and kekulized for N atom which is in aromatic ring\n")
+            for i, atom in enumerate(self.rw_mol.GetAtoms()):
+                if atom.GetSymbol() == "N" and atom.GetIsAromatic():
+                    print("Aromatic N atom idex: ",i+1)
+                    self.rw_mol.GetAtomWithIdx(i+1).SetNumExplicitHs(1)
         # remove temp
         self._rmFileExist(tmp_file_name)
 
