@@ -25,7 +25,7 @@ parser.add_argument("pre_optimization_lig", nargs="?", default="No") # args for 
 parser.add_argument("genconformer", nargs="?", default="No") # args for bool
 parser.add_argument("nprocs", type=int, default=nprocs_all)
 parser.add_argument("thr_fmax", type=float, default=0.05)
-parser.add_argument("maxiter", type=float, default=500)
+parser.add_argument("maxiter", type=int, default=500)
 
 parser.add_argument("ETKDG", nargs="?", default="No") # args for bool
 parser.add_argument("num_conformers", type=int, default=50)
