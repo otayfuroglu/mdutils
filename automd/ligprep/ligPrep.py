@@ -57,6 +57,22 @@ class ligPrep:
         rd_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, sanitize=sanitize, removeHs=False)
         self.rw_mol = Chem.RWMol(rd_mol)
 
+    def _rdKekuleizeError(self, rd_mol):
+        # correction  kekuleize error (especially N in aromatic ring)
+        print("\nWarning!: There is kekulize error, ingnored sanitize and kekulized for N atom which is in aromatic ring\n")
+        for i, atom in enumerate(rd_mol.GetAtoms()):
+            if atom.GetSymbol() == "N" and atom.GetIsAromatic():
+                print("Aromatic N atom idex: ",i+1)
+                rd_mol.GetAtomWithIdx(i+1).SetNumExplicitHs(1)
+        return rd_mol
+
+    def _reKekuleizeError(self, rd_mol):
+        for i, atom in enumerate(rd_mol.GetAtoms()):
+            if atom.GetSymbol() == "N" and atom.GetIsAromatic():
+                print("Aromatic N atom idex: ",i+1)
+                rd_mol.GetAtomWithIdx(i+1).SetNumExplicitHs(0)
+        return rd_mol
+
     def _loadMolWithOB(self):
 
         obConversion = openbabel.OBConversion()
@@ -80,13 +96,14 @@ class ligPrep:
             self._loadMolWithRW(tmp_file_name)
         except:
             self._loadMolWithRW(tmp_file_name, sanitize=False)
+            self.rw_mol = self._rdKekuleizeError(self.rw_mol)
 
             # correction  kekuleize error (especially N in aromatic ring)
-            print("\nWarning!: There is kekulize error, ingnored sanitize and kekulized for N atom which is in aromatic ring\n")
-            for i, atom in enumerate(self.rw_mol.GetAtoms()):
-                if atom.GetSymbol() == "N" and atom.GetIsAromatic():
-                    print("Aromatic N atom idex: ",i+1)
-                    self.rw_mol.GetAtomWithIdx(i+1).SetNumExplicitHs(1)
+            #  print("\nWarning!: There is kekulize error, ingnored sanitize and kekulized for N atom which is in aromatic ring\n")
+            #  for i, atom in enumerate(self.rw_mol.GetAtoms()):
+            #      if atom.GetSymbol() == "N" and atom.GetIsAromatic():
+            #          print("Aromatic N atom idex: ",i+1)
+            #          self.rw_mol.GetAtomWithIdx(i+1).SetNumExplicitHs(1)
         # remove temp
         self._rmFileExist(tmp_file_name)
 
@@ -588,10 +605,18 @@ class ligPrep:
 
         #  from aseAtoms2rdMol import fromASE, to_rdmol, ase2rdmol
         write("tmp.pdb", ase_atoms)
-        rd_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb", removeHs=False)
+        #  rd_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb", removeHs=False)
+
+        rd_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb", sanitize=True, removeHs=False)
         self._rmFileExist("tmp.pdb")
 
-        return AllChem.AssignBondOrdersFromTemplate(self.rw_mol, rd_mol)
+        try:
+            return AllChem.AssignBondOrdersFromTemplate(self.rw_mol, rd_mol)
+        except:
+            #  rd_mol = self._reKekuleizeError(rd_mol)
+            #  return AllChem.AssignBondOrdersFromTemplate(self.rw_mol, rd_mol)
+            return rd_mol
+
 
     def writeAseAtoms(self, file_path):
         ase_atoms = self.rwMol2AseAtoms()
