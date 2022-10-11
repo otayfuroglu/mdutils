@@ -55,6 +55,8 @@ class ligPrep:
 
     def _loadMolWithRW(self, mol_path, sanitize=True):
         rd_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, sanitize=sanitize, removeHs=False)
+        if sanitize is False:
+            rd_mol.UpdatePropertyCache(strict=False)
         self.rw_mol = Chem.RWMol(rd_mol)
 
     def _rdKekuleizeError(self, rd_mol):
@@ -63,14 +65,7 @@ class ligPrep:
         for i, atom in enumerate(rd_mol.GetAtoms()):
             if atom.GetSymbol() == "N" and atom.GetIsAromatic():
                 print("Aromatic N atom idex: ",i+1)
-                rd_mol.GetAtomWithIdx(i+1).SetNumExplicitHs(1)
-        return rd_mol
-
-    def _reKekuleizeError(self, rd_mol):
-        for i, atom in enumerate(rd_mol.GetAtoms()):
-            if atom.GetSymbol() == "N" and atom.GetIsAromatic():
-                print("Aromatic N atom idex: ",i+1)
-                rd_mol.GetAtomWithIdx(i+1).SetNumExplicitHs(0)
+                atom.SetNumExplicitHs(1)
         return rd_mol
 
     def _loadMolWithOB(self):
@@ -610,12 +605,7 @@ class ligPrep:
         rd_mol = Chem.rdmolfiles.MolFromPDBFile("tmp.pdb", sanitize=True, removeHs=False)
         self._rmFileExist("tmp.pdb")
 
-        try:
-            return AllChem.AssignBondOrdersFromTemplate(self.rw_mol, rd_mol)
-        except:
-            #  rd_mol = self._reKekuleizeError(rd_mol)
-            #  return AllChem.AssignBondOrdersFromTemplate(self.rw_mol, rd_mol)
-            return rd_mol
+        return AllChem.AssignBondOrdersFromTemplate(self.rw_mol, rd_mol)
 
 
     def writeAseAtoms(self, file_path):
