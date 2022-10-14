@@ -383,14 +383,14 @@ class ligPrep:
             for i, conformerId  in enumerate(minEConformerIDs):
                 e, ase_atoms = self._geomOptimizationConf(mol, conformerId)
                 prefix = "opt_"
-                conf_file_path = "%s/%sconf_%d.xyz"%(MIN_E_CONF_DIR, prefix, conformerId)
+                conf_file_path = "%s/%sconf_%d.sdf"%(MIN_E_CONF_DIR, prefix, conformerId)
 
                 # save optimized structure  with ase
-                write(conf_file_path, ase_atoms)
+                #  write(conf_file_path, ase_atoms)
 
-                # save optimized structure  with rdkit as sdf
-                #  with Chem.rdmolfiles.SDWriter(conf_file_path) as writer:
-                #      writer.write(self.aseAtoms2rwMol(ase_atoms))
+                #  save optimized structure  with rdkit as sdf
+                with Chem.rdmolfiles.SDWriter(conf_file_path) as writer:
+                    writer.write(self.aseAtoms2rwMol(ase_atoms))
 
                 print("%sconf_%d.sdf, %s"%(prefix, conformerId, e), file=opt_file_csv)
             opt_file_csv.close()
