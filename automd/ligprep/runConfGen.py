@@ -121,14 +121,18 @@ def runConfGen(file_name):
         print("Conformer generation process is done")
         if not optimization_conf and optimization_lig:
             print("Optimization for minumum energy conformer")
-            lig.geomOptimization()
+            e = lig.geomOptimization()
+            e_file = open("%s/global_%s%s_energy.txt"%(WORK_DIR, prefix, file_base) , "w")
+            #  lig.geomOptimization()
 
     else:
         out_file_path="%s/global_%s%s.sdf"%(WORK_DIR, prefix, file_base)
         # geometry optimizaton for ligand
         if  optimization_lig:
+            e = lig.geomOptimization()
+            e_file = open("%s/global_%s%s_energy.txt"%(WORK_DIR, prefix, file_base) , "w")
+            print(e, " eV", file=e_file)
             #  ase_atoms = lig.rwMol2AseAtoms()
-            lig.geomOptimization()
 
     # write minimun energy conformer to sdf file
     lig.writeRWMol2File(out_file_path)
