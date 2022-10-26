@@ -54,7 +54,8 @@ class ligPrep:
         self._loadMolWithOB()
 
     def _loadMolWithRW(self, mol_path, sanitize=True):
-        rd_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, sanitize=sanitize, removeHs=False)
+        #  rd_mol = Chem.rdmolfiles.MolFromMol2File(mol_path, sanitize=sanitize, removeHs=False)
+        rd_mol = next(Chem.SDMolSupplier(mol_path, sanitize=sanitize, removeHs=False))
         if sanitize is False:
             rd_mol.UpdatePropertyCache(strict=False)
         self.rw_mol = Chem.RWMol(rd_mol)
@@ -76,6 +77,7 @@ class ligPrep:
         #  obConversion.ReadFile(ob_mol, self.mol_path)
 
         pb_mol = next(pybel.readfile(self._getFileFormat(), self.mol_path))
+        tmp_file_name = "tmp_ob_file.sdf"
 
         #add hydrogen with openbabel
         if self.addH:
@@ -84,11 +86,10 @@ class ligPrep:
                 exit(1)
 
             if self._getFileFormat() != "sdf":
+                # coorection sfg for add true Hydrogen
                 #  print(self._getFileFormat())
-                tmp_file_name = "tmp_ob_file.sdf"
                 pb_mol.write("sdf", tmp_file_name, overwrite=True)
 
-                # coorection sfg for add true Hydrogen
                 corr_tmp_file_name = "corr_tmp_ob_file.sdf"
                 corr_part = "  0  0  0  0  0  0  0  0  0  0"
                 with open(corr_tmp_file_name, "w") as corr_sdf:
@@ -103,7 +104,6 @@ class ligPrep:
                 self._rmFileExist(corr_tmp_file_name)
 
             #  pb_mol.removeh()
-            print("Charge ", pb_mol.charge)
             pb_mol.addh()
             pb_mol.make3D()
 
@@ -114,8 +114,7 @@ class ligPrep:
             #                     )
 
         #  # openbabel file to rdkit mol2 file
-        tmp_file_name = "tmp_ob_file.mol2"
-        pb_mol.write("mol2", tmp_file_name, overwrite=True)
+        pb_mol.write("sdf", tmp_file_name, overwrite=True)
         #  obConversion.WriteFile(ob_mol, tmp_file_name)
 
         # laod as RW file
@@ -132,7 +131,7 @@ class ligPrep:
             #          print("Aromatic N atom idex: ",i+1)
             #          self.rw_mol.GetAtomWithIdx(i+1).SetNumExplicitHs(1)
         # remove temp
-        self._rmFileExist(tmp_file_name)
+        #  self._rmFileExist(tmp_file_name)
 
         # NOTE
         #  ase_atoms = self.obMol2AseAtoms(ob_mol)
@@ -589,10 +588,11 @@ class ligPrep:
             dyn = self._getOptMethod(ase_atoms)
             dyn.run(fmax=self.fmax, steps=self.maxiter)
 
-        file_csv = open("%s/optmized_energy.csv" %self.WORK_DIR, "w")
-        print(ase_atoms.get_potential_energy(), ",eV", file=file_csv)
+        #  file_csv = open("%s/optmized_energy.csv" %self.WORK_DIR, "w")
+        #  print(ase_atoms.get_potential_energy(), ",eV", file=file_csv)
 
         self.rw_mol = self.aseAtoms2rwMol(ase_atoms)
+        return ase_atoms.get_potential_energy()
 
 
         #  return ase_atoms.get_potential_energy(), ase_atoms
