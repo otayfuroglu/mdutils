@@ -1,5 +1,5 @@
 #
-from openbabel import openbabel
+from openbabel import openbabel, pybel
 from ase import Atoms
 from ase.io import write
 
@@ -70,21 +70,53 @@ class ligPrep:
 
     def _loadMolWithOB(self):
 
-        obConversion = openbabel.OBConversion()
-        obConversion.SetInAndOutFormats(self._getFileFormat(), "mol2")
-        ob_mol = openbabel.OBMol()
-        obConversion.ReadFile(ob_mol, self.mol_path)
+        #  obConversion = openbabel.OBConversion()
+        #  obConversion.SetInAndOutFormats(self._getFileFormat(), "mol2")
+        #  ob_mol = openbabel.OBMol()
+        #  obConversion.ReadFile(ob_mol, self.mol_path)
+
+        pb_mol = next(pybel.readfile(self._getFileFormat(), self.mol_path))
 
         #add hydrogen with openbabel
         if self.addH:
             if self._getFileFormat() == "xyz":
                 print("Error: Cannot add hydrogen atoms to XYZ file format!!!")
                 exit(1)
-            ob_mol.AddHydrogens()
+
+            if self._getFileFormat() != "sdf":
+                #  print(self._getFileFormat())
+                tmp_file_name = "tmp_ob_file.sdf"
+                pb_mol.write("sdf", tmp_file_name, overwrite=True)
+
+                # coorection sfg for add true Hydrogen
+                corr_tmp_file_name = "corr_tmp_ob_file.sdf"
+                corr_part = "  0  0  0  0  0  0  0  0  0  0"
+                with open(corr_tmp_file_name, "w") as corr_sdf:
+                    with open(tmp_file_name) as lines:
+                        for line in lines:
+                            if len(line) == 70:
+                                line = line[:40] + corr_part + "\n"
+                            corr_sdf.write(line)
+
+                pb_mol = next(pybel.readfile("sdf", corr_tmp_file_name))
+                self._rmFileExist(tmp_file_name)
+                self._rmFileExist(corr_tmp_file_name)
+
+            #  pb_mol.removeh()
+            print("Charge ", pb_mol.charge)
+            pb_mol.addh()
+            pb_mol.make3D()
+
+            #  ob_mol.DeleteHydrogens()
+            #  ob_mol.AddHydrogens(True, # Whether to add hydrogens only to polar atoms (i.e., not to C atoms)
+            #                      True,  # correctForPH 	Whether to call CorrectForPH() first
+            #                      7.4,  # The pH to use for CorrectForPH() modification
+            #                     )
 
         #  # openbabel file to rdkit mol2 file
         tmp_file_name = "tmp_ob_file.mol2"
-        obConversion.WriteFile(ob_mol, tmp_file_name)
+        pb_mol.write("mol2", tmp_file_name, overwrite=True)
+        #  obConversion.WriteFile(ob_mol, tmp_file_name)
 
         # laod as RW file
         try:
