@@ -33,6 +33,7 @@ parser.add_argument("num_conformers", type=int, default=50)
 parser.add_argument("max_attempts", type=int, default=100)
 parser.add_argument("prune_rms_thresh", type=float, default=0.2)
 parser.add_argument("opt_prune_rms_thresh", type=float, default=0.2)
+parser.add_argument("opt_prune_diffE_thresh", type=float, default=0.001)
 
 
 def calcFuncRunTime(func):
@@ -127,6 +128,7 @@ def runConfGen(file_name):
             mmCalculator=mmCalculator,
             optimization_conf=optimization_conf,
             opt_prune_rms_thresh=opt_prune_rms_thresh,
+            opt_prune_diffE_thresh=opt_prune_diffE_thresh,
         )
 
         print("Conformer generation process is done")
@@ -180,6 +182,7 @@ if __name__ == "__main__":
     max_attempts = args.max_attempts
     prune_rms_thresh = args.prune_rms_thresh
     opt_prune_rms_thresh = args.opt_prune_rms_thresh
+    opt_prune_diffE_thresh = args.opt_prune_diffE_thresh
 
     file_names = [item for item in os.listdir(structure_dir) if not item.startswith(".")]
     failed_csv = open("failed_files.csv", "w")
