@@ -8,6 +8,7 @@ from ligPrep import ligPrep
 import argparse
 import os, sys, shutil
 import multiprocessing
+from itertools import product
 import time
 
 nprocs_all = int(multiprocessing.cpu_count())
@@ -34,6 +35,15 @@ parser.add_argument("prune_rms_thresh", type=float, default=0.2)
 parser.add_argument("opt_prune_rms_thresh", type=float, default=0.2)
 
 
+def calcFuncRunTime(func):
+    import time
+    def wrapper(*args, **kwargs):
+        s_time = time.time()
+        func(*args, **kwargs)
+        print(f"Funtion {func.__name__} executed in {(time.time()-s_time)/60:.4f} m")
+    return wrapper
+
+
 def getBoolStr(string):
     string = string.lower()
     if "true" in string or "yes" in string:
@@ -57,6 +67,7 @@ def setG16calculator(lig, file_base, label, WORK_DIR):
     return lig
 
 
+#  @calcFuncRunTime
 def runConfGen(file_name):
     "Starting ligand preparetion process... "
     mol_path= "%s/%s"%(structure_dir, file_name)
