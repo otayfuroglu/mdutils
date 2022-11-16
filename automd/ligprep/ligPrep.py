@@ -15,6 +15,9 @@ import pandas as pd
 from multiprocessing import Pool, cpu_count
 from itertools import product, repeat
 
+from scipy.cluster.vq import kmeans, vq, whiten
+from scipy.cluster.hierarchy import linkage, fcluster
+
 
 NPROCS_ALL = int(cpu_count())
 print("Number of total cpu core: ", NPROCS_ALL)
@@ -286,7 +289,6 @@ class ligPrep:
 
 
     def _getClusterKmeansFromConfIds(self, conformerIds, dist_matrix, n_group):
-        from scipy.cluster.vq import kmeans, vq, whiten
 
         cluster_conf_id = defaultdict(list)
         whitened = whiten(dist_matrix)
@@ -298,7 +300,7 @@ class ligPrep:
         return cluster_conf_id
 
     def _getClusterRMSDFromFiles(self, conf_dir, rmsd_thresh):
-        from scipy.cluster.hierarchy import linkage, fcluster
+
         mol_dict = {next(Chem.SDMolSupplier(f"{conf_dir}/{fl_name}")):
                       fl_name for fl_name in os.listdir(conf_dir)
                       if fl_name.endswith(".sdf")}
@@ -312,8 +314,8 @@ class ligPrep:
             return 0
 
         linked = linkage(dist_matrix,'complete')
-        cluster_conf = defaultdict(list)
         labelList = [mol.GetProp('_Name') for mol in mol_list]
+        cluster_conf = defaultdict(list)
         for key, fl_name in zip(fcluster(linked, rmsd_thresh, criterion='distance'), labelList):
             cluster_conf[key].append(fl_name)
 
@@ -331,10 +333,27 @@ class ligPrep:
 
         return cluster_conf
 
-    def _pruneOptConfs(self, cluster_conf, confs_energies, conf_dir):
+    def _getCluster_diffE(self, files_minE, diffE_thresh=0.001):
+        n_files = len(files_minE)
+        dist_matrix = np.zeros(shape=(n_files, n_files))
+        for i , val1 in enumerate(files_minE.values()):
+            for j, val2 in  enumerate(files_minE.values()):
+                e_diff = val1 - val2
+                dist_matrix[i, j] = abs(val1 - val2 )
+        #  print(dist_matrix)
+        linked = linkage(dist_matrix,'complete')
+        label_list = list(files_minE.keys())
+        cluster_conf = defaultdict(list)
+        for key, fl_name in zip(fcluster(linked, diffE_thresh, criterion='distance'), label_list):
+            cluster_conf[key].append(fl_name)
+        return cluster_conf
+
+    def _pruneOptConfs(self, cluster_conf, confs_energies, conf_dir, opt_prune_diffE_thresh):
         i = 0
 
-        local_min_files = {}
+        local_files_minE = {}
+        # for rmsd filter
+        print("Applied diff RMSD filter (Angstrom)")
         for fl_names in cluster_conf.values():
             for j, fl_name in enumerate(fl_names):
                 #  e = float(confs_energies.loc[confs_energies["FileName"] == fl_name, " Energy(eV)"].item())
@@ -356,17 +375,27 @@ class ligPrep:
                         minE = e
                         minE_file = fl_name
 
-            local_min_files[minE_file] = minE
-            #  print(local_min_files) # NOTE 
             fl_names.remove(minE_file)
             os.rename(f"{conf_dir}/{minE_file}", f"{conf_dir}/pruned_{minE_file}")
+            local_files_minE[f"pruned_{minE_file}"] = minE
+
             if len (fl_names) != 0:
                 for rm_file in fl_names:
                     print("Removed", rm_file)
                     os.remove(f"{conf_dir}/{rm_file}")
 
+        # for the energy filter
+        print("Applied diff Energy filter (eV/Atom)")
+        cluster_conf = self._getCluster_diffE(local_files_minE, diffE_thresh=opt_prune_diffE_thresh)
+        for fl_names in cluster_conf.values():
+            if len(fl_names) > 1:
+                for fl_name in fl_names[1:]:
+                    print("Removed", fl_name)
+                    os.remove(f"{conf_dir}/{fl_name}")
+
         # file which has global minimum enery renamed 
         os.rename(f"{conf_dir}/pruned_{global_minE_file}", f"{conf_dir}/global_minE_{global_minE_file}")
+        # NOTE
 
     #  @calcFuncRunTime
     def genMinEGonformer(self, file_path,
@@ -377,6 +406,7 @@ class ligPrep:
                          mmCalculator=False,
                          optimization_conf=False,
                          opt_prune_rms_thresh=1.0,
+                         opt_prune_diffE_thresh=0.001,
                          saveConfs=True,
                          useExpTorsionAnglePrefs=True,
                          useBasicKnowledge=True,
@@ -506,7 +536,7 @@ class ligPrep:
             #  print(confs_energies)
             cluster_conf = self._getClusterRMSDFromFiles(MIN_E_CONF_DIR, rmsd_thresh=opt_prune_rms_thresh)
             if cluster_conf != 0:
-                self._pruneOptConfs(cluster_conf, confs_energies, MIN_E_CONF_DIR)
+                self._pruneOptConfs(cluster_conf, confs_energies, MIN_E_CONF_DIR, opt_prune_diffE_thresh)
 
                 #  #create ase atoms
                 #  ase_atoms = self._rwConformer2AseAtoms(mol, conformerId)
