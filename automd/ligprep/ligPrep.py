@@ -390,15 +390,17 @@ class ligPrep:
                     os.remove(f"{conf_dir}/{rm_file}")
 
         # for the energy filter
-        print("Applied diff Energy filter (eV/Atom)")
-        cluster_conf = self._getCluster_diffE(local_files_minE, diffE_thresh=opt_prune_diffE_thresh)
-        for fl_names in cluster_conf.values():
-            if len(fl_names) > 1:
-                for fl_name in fl_names[1:]: # remove all file except first
-                    if fl_name == f"pruned_{global_minE_file}": # if any candidate removed file is global min 
-                        fl_name = fl_names[0] #  remove first file
-                    print("Removed", fl_name)
-                    os.remove(f"{conf_dir}/{fl_name}")
+        print(len(local_files_minE))
+        if len(local_files_minE) > 1:
+            print("Applied diff Energy filter (eV/Atom)")
+            cluster_conf = self._getCluster_diffE(local_files_minE, diffE_thresh=opt_prune_diffE_thresh)
+            for fl_names in cluster_conf.values():
+                if len(fl_names) > 1:
+                    for fl_name in fl_names[1:]: # remove all file except first
+                        if fl_name == f"pruned_{global_minE_file}": # if any candidate removed file is global min 
+                            fl_name = fl_names[0] #  remove first file
+                        print("Removed", fl_name)
+                        os.remove(f"{conf_dir}/{fl_name}")
 
         # file which has global minimum enery renamed 
         os.rename(f"{conf_dir}/pruned_{global_minE_file}", f"{conf_dir}/global_minE_{global_minE_file}")
