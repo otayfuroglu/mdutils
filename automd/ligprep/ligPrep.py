@@ -14,6 +14,7 @@ import pandas as pd
 
 from multiprocessing import Pool, cpu_count
 from itertools import product, repeat
+from functools import wraps
 
 from scipy.cluster.vq import kmeans, vq, whiten
 from scipy.cluster.hierarchy import linkage, fcluster
@@ -25,10 +26,12 @@ print("Number of total cpu core: ", NPROCS_ALL)
 
 def calcFuncRunTime(func):
     import time
+
+    @wraps(func)
     def wrapper(*args, **kwargs):
         s_time = time.time()
         func(*args, **kwargs)
-        print(f"Funtion {func.__name__} executed in {(time.time()-s_time)/60:.5f} m")
+        print(f"Function {func.__name__} executed in {(time.time()-s_time)/60:.5f} m")
     return wrapper
 
 
@@ -51,7 +54,7 @@ def calcRMSDsymm(pair_idx, mol_list):
                                 mol_list[idx2])
                    )
 
-
+#  @calcFuncRunTime
 def getDistMatrix(mol_list, conformerIds=None):
 
     n_mol=len(mol_list)
@@ -259,8 +262,8 @@ class ligPrep:
 
     def _getNumConfs(self, scaled=1):
         n_torsions = len(self._getTorsionPoints())
-        if n_torsions > 10:
-            return 5000
+        if n_torsions >= 10:
+            return 8096
         else:
             return int(scaled * 2 ** n_torsions)
 
@@ -288,6 +291,7 @@ class ligPrep:
     #      return conf_dist_matrix
 
 
+    #  @calcFuncRunTime
     def _getClusterKmeansFromConfIds(self, conformerIds, dist_matrix, n_group):
 
         cluster_conf_id = defaultdict(list)
@@ -299,6 +303,7 @@ class ligPrep:
 
         return cluster_conf_id
 
+    #  @calcFuncRunTime
     def _getClusterRMSDFromFiles(self, conf_dir, rmsd_thresh):
 
         mol_dict = {next(Chem.SDMolSupplier(f"{conf_dir}/{fl_name}")):
@@ -389,7 +394,9 @@ class ligPrep:
         cluster_conf = self._getCluster_diffE(local_files_minE, diffE_thresh=opt_prune_diffE_thresh)
         for fl_names in cluster_conf.values():
             if len(fl_names) > 1:
-                for fl_name in fl_names[1:]:
+                for fl_name in fl_names[1:]: # remove all file except first
+                    if fl_name == f"pruned_{global_minE_file}": # if any candidate removed file is global min 
+                        fl_name = fl_names[0] #  remove first file
                     print("Removed", fl_name)
                     os.remove(f"{conf_dir}/{fl_name}")
 
@@ -397,7 +404,6 @@ class ligPrep:
         os.rename(f"{conf_dir}/pruned_{global_minE_file}", f"{conf_dir}/global_minE_{global_minE_file}")
         # NOTE
 
-    #  @calcFuncRunTime
     def genMinEGonformer(self, file_path,
                          numConfs=100,
                          ETKDG=False,
@@ -405,7 +411,7 @@ class ligPrep:
                          pruneRmsThresh=0.1,
                          mmCalculator=False,
                          optimization_conf=False,
-                         opt_prune_rms_thresh=1.0,
+                         opt_prune_rms_thresh=0.2,
                          opt_prune_diffE_thresh=0.001,
                          saveConfs=True,
                          useExpTorsionAnglePrefs=True,
@@ -416,14 +422,18 @@ class ligPrep:
         import copy
 
         #  self.addHwithRD()
+        print("Woking on conformer generation process")
         mol = copy.deepcopy(self.rw_mol)
-        if numConfs is 0 or numConfs < self._getNumConfs(scaled=10):
+        if numConfs == 0 or numConfs < self._getNumConfs(scaled=10):
             numConfs = self._getNumConfs(scaled=10)
             print(f"Maximum number of conformers setting to {numConfs}")
 
         if ETKDG:
             conformerIds = list(rdkit.Chem.AllChem.EmbedMultipleConfs(
-                mol, numConfs=numConfs))
+                mol,
+                numConfs=numConfs,
+                numThreads=NPROCS_ALL,
+            ))
         else:
             conformerIds = list(rdkit.Chem.AllChem.EmbedMultipleConfs(
                 mol,
@@ -433,7 +443,7 @@ class ligPrep:
                 useExpTorsionAnglePrefs=useExpTorsionAnglePrefs,
                 useBasicKnowledge=useBasicKnowledge,
                 enforceChirality=enforceChirality,
-                numThreads=0,
+                numThreads=NPROCS_ALL,
             ))
 
         # file for saving energies
@@ -444,11 +454,14 @@ class ligPrep:
 
         #  for k-means clutering
         #  dist_matrix = self._getConfDistMatrix(mol, conformerIds)
+        print("Obtaining pairwise distance distribution matrix")
         dist_matrix = getDistMatrix([mol], conformerIds)
 
+        print("Processing k-means clustering")
         cluster_conf_id = self._getClusterKmeansFromConfIds(conformerIds, dist_matrix,
                                            n_group=self._getNumConfs(scaled=1)
                                           )
+        print("Calculating SP energies")
         minEConformerIDs = []
         for cluster, clustered_confIds in cluster_conf_id.items():
 
@@ -555,6 +568,7 @@ class ligPrep:
                 #          minEConformerID = conformerId
                 #          minE_ase_atoms = ase_atoms
 
+
     def _calcEnergyWithMM(self, mol, conformerId, minimizeIts):
         ff = rdkit.Chem.AllChem.MMFFGetMoleculeForceField(
             mol,
@@ -591,7 +605,6 @@ class ligPrep:
 
         self.calculator = torchani.models.ANI2x().to(device).ase()
 
-    #  @calcFuncRunTime
     def _calcSPEnergy(self, mol, conformerId):
 
         if self.calculator is None:
